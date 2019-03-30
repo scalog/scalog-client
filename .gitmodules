@@ -1,0 +1,3 @@
+[submodule "scalog"]
+	path = scalog
+	url = git@github.com:scalog/scalog.git
