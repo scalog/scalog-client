@@ -3,15 +3,15 @@ package client
 import (
 	"context"
 
-	rpc "github.com/scalog/scalog-client/scalog/discovery/rpc"
+	rpc "github.com/scalog/scalog/discovery/rpc"
 	"google.golang.org/grpc"
 )
 
-func discoverServers(port string) []string {
+func discoverServerPorts(address string) []int32 {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
 
-	conn, err := grpc.Dial(port, opts...)
+	conn, err := grpc.Dial(address, opts...)
 	if err != nil {
 		panic(err)
 	}
