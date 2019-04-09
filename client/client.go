@@ -4,6 +4,7 @@ package client
 import (
     "context"
     "fmt"
+    "io"
     "math/rand"
     "sync"
 
@@ -19,12 +20,18 @@ import (
  */
 type Client struct {
     // Integer serving as unique client id
-    cid     int32
+    cid         int32
     // Client-generated record sequence number
-    csn     int32
+    csn         int32
     // Mutex for interacting with [csn]
-    mu      sync.RWMutex
+    mu          sync.RWMutex
 }
+
+/*
+ * Function that is called when a data server reports an ordered record to the
+ * client after the client has subscribed.
+ */
+type Callback func(int32, string, error)
 
 /*
  * Initializes and returns a new instance of [Client] with a unique client id.
@@ -70,8 +77,11 @@ func (c *Client) Append(r string) (int32, error) {
 /*
  * Subscribes to records starting from global sequence number [gsn].
  */
-func (c *Client) Subscribe(gsn int32) {
-    // TODO
+func (c *Client) Subscribe(gsn int32, callback Callback) {
+    ports := discoverServers("130.127.133.24:32403") // TODO: move port to config file
+    for _, port := range ports {
+        go c.subscribe(port, gsn, callback)
+    }
 }
 
 /*
@@ -121,4 +131,39 @@ func appendPlacementPolicy(ports []int32) int32 {
         panic("Failed to append: no active data servers discovered!")
     }
     return ports[rand.Intn(len(ports))] // TODO: select port based on data placement policy
+}
+
+/*
+ * Creates a stream to the data server on port [port], listens for the data
+ * data server to report ordered records with gsn > [gsn], and passes those
+ * arguments to the [callback] function.
+ */
+func (c *Client) subscribe(port int32, gsn int32, callback Callback) {
+    var opts []grpc.DialOption
+    opts = append(opts, grpc.WithInsecure())
+    conn, err := grpc.Dial(fmt.Sprintf("130.127.133.24:%d", port), opts...)
+    if err != nil {
+        panic(err)
+    }
+    defer conn.Close()
+
+    dataClient := data.NewDataClient(conn)
+    r := &data.SubscribeRequest{
+        SubscriptionGsn: gsn,
+    }
+    stream, err := dataClient.Subscribe(context.Background(), r)
+    if err != nil {
+        panic(err)
+    }
+
+    for true {
+        in, err := stream.Recv()
+        if err == io.EOF {
+            return
+        }
+        if err != nil {
+            callback(-1, "", err)
+        }
+        callback(in.Gsn, in.Record, nil) // TODO: filter duplicate gsn
+    }
 }
