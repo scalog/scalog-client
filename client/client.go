@@ -4,6 +4,7 @@ package client
 import (
     "context"
     "fmt"
+    "math/rand"
     "sync"
 
     data "github.com/scalog/scalog/data/messaging"
@@ -119,5 +120,5 @@ func appendPlacementPolicy(ports []int32) int32 {
     if len(ports) == 0 {
         panic("Failed to append: no active data servers discovered!")
     }
-    return ports[0] // TODO: select port based on data placement policy
+    return ports[rand.Intn(len(ports))] // TODO: select port based on data placement policy
 }
