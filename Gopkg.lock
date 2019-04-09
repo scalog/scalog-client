@@ -17,11 +17,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:bf4e430e3d594be211ce957bcb5f3ab672c43a82af179df454530498d9c2fdbc"
+  digest = "1:b17076be9fd71b78fde96c9d8511c4c6c7196f3988b0c074dfda8be2dbb7c7f7"
   name = "github.com/scalog/scalog"
   packages = ["discovery/rpc"]
   pruneopts = "UT"
-  revision = "f79dbcf3b147421bfab2316fa2a637cb832d92a2"
+  revision = "d7f21f1f5af37cdb9263e50cf1dbd5820ce3d6fc"
 
 [[projects]]
   branch = "master"
