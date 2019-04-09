@@ -88,7 +88,10 @@ func (c *Client) Subscribe(gsn int32, callback Callback) {
  * Deletes records before global sequence number [gsn].
  */
 func (c *Client) Trim(gsn int32) {
-    // TODO
+    ports := discoverServers("130.127.133.24:32403") // TODO: move port to config file
+    for _, port := range ports {
+        go c.trim(port, gsn)
+    }
 }
 
 /*
@@ -166,4 +169,25 @@ func (c *Client) subscribe(port int32, gsn int32, callback Callback) {
         }
         callback(in.Gsn, in.Record, nil) // TODO: filter duplicate gsn
     }
+}
+
+/*
+ * Creates a stream to the data server on port [port] and requests that
+ * all records with gsn < [gsn] be deleted.
+ */
+func (c *Client) trim(port int32, gsn int32) {
+    var opts []grpc.DialOption
+    opts = append(opts, grpc.WithInsecure())
+    conn, err := grpc.Dial(fmt.Sprintf("130.127.133.24:%d", port), opts...)
+    if err != nil {
+        panic(err)
+    }
+    defer conn.Close()
+
+    dataClient := data.NewDataClient(conn)
+    r := &data.TrimRequest{
+        Gsn: gsn,
+    }
+    dataClient.Trim(context.Background(), r)
+    // No response expected
 }
