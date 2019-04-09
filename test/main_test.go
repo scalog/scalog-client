@@ -9,6 +9,9 @@ import (
 
 func TestClientAppend(t *testing.T) {
 	client := client.NewClient()
-	resp := client.Append("Hello, World!")
-	fmt.Println(fmt.Sprintf("%d", resp))
+	resp, err := client.Append("Hello, World!")
+	if err != nil {
+		fmt.Println(err)
+	}
+	fmt.Println(fmt.Sprintf("Global sequence number: %d", resp))
 }

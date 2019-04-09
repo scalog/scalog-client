@@ -40,7 +40,7 @@ func NewClient() *Client {
 /*
  * Appends a record [r], and returns the global sequence number assigned to it.
  */
-func (c *Client) Append(r string) int32 {
+func (c *Client) Append(r string) (int32, error) {
     var opts []grpc.DialOption
     opts = append(opts, grpc.WithInsecure())
     ports := discoverServers("130.127.133.24:32403") // TODO: move port to config file
@@ -62,9 +62,9 @@ func (c *Client) Append(r string) int32 {
     c.mu.Unlock()
     resp, err := dataClient.Append(context.Background(), appendRequest)
     if err != nil {
-        panic(err)
+        return -1, err
     }
-    return resp.Gsn
+    return resp.Gsn, nil
 }
 
 /*
