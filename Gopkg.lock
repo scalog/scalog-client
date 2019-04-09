@@ -17,9 +17,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:b17076be9fd71b78fde96c9d8511c4c6c7196f3988b0c074dfda8be2dbb7c7f7"
+  digest = "1:c6ab87ef61bb7afeeb7cffb3cb81cacc7ce4a2ed62da083f0ffdaf6d3b851cde"
   name = "github.com/scalog/scalog"
-  packages = ["discovery/rpc"]
+  packages = [
+    "data/messaging",
+    "discovery/rpc",
+  ]
   pruneopts = "UT"
   revision = "d7f21f1f5af37cdb9263e50cf1dbd5820ce3d6fc"
 
@@ -121,6 +124,7 @@
   analyzer-name = "dep"
   analyzer-version = 1
   input-imports = [
+    "github.com/scalog/scalog/data/messaging",
     "github.com/scalog/scalog/discovery/rpc",
     "google.golang.org/grpc",
   ]

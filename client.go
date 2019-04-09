@@ -1,27 +1,123 @@
+/* Package provides clients with the ability to interact with the Scalog API. */
 package client
 
 import (
-	"context"
+    "context"
+    "fmt"
+    "sync"
 
-	rpc "github.com/scalog/scalog/discovery/rpc"
-	"google.golang.org/grpc"
+    data "github.com/scalog/scalog/data/messaging"
+    discovery "github.com/scalog/scalog/discovery/rpc"
+    "google.golang.org/grpc"
 )
 
-func discoverServerPorts(address string) []int32 {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
+/*
+ * Struct that carries the meta-data necessary for a client to interact with the
+ * Scalog API. Clients should initialize a new instance of this struct with the
+ * newClient() function.
+ */
+type Client struct {
+    // Integer serving as unique client id
+    cid     int32
+    // Client-generated record sequence number
+    csn     int32
+    // Mutex for interacting with [csn]
+    mu      sync.RWMutex
+}
 
-	conn, err := grpc.Dial(address, opts...)
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-	client := rpc.NewDiscoveryClient(conn)
-	discoveryRequest := &rpc.DiscoverRequest{}
+/*
+ * Initializes and returns a new instance of [Client] with a unique client id.
+ */
+func NewClient() *Client {
+    return &Client{
+        cid:    assignClientId(),
+        csn:    0,
+        mu:     sync.RWMutex{},
+    }
+}
 
-	resp, err := client.DiscoverServers(context.Background(), discoveryRequest)
-	if err != nil {
-		panic(err)
-	}
-	return resp.ServerAddresses
+/*
+ * Appends a record [r], and returns the global sequence number assigned to it.
+ */
+func (c *Client) Append(r string) int32 {
+    var opts []grpc.DialOption
+    opts = append(opts, grpc.WithInsecure())
+    ports := discoverServers("130.127.133.24:32403") // TODO: move port to config file
+    port := appendPlacementPolicy(ports)
+    conn, err := grpc.Dial(fmt.Sprintf("130.127.133.24:%d", port), opts...)
+    if err != nil {
+        panic(err)
+    }
+    defer conn.Close()
+
+    dataClient := data.NewDataClient(conn)
+    c.mu.Lock()
+    appendRequest := &data.AppendRequest {
+        Cid:    c.cid,
+        Csn:    c.csn,
+        Record: r,
+    }
+    c.csn = c.csn + 1
+    c.mu.Unlock()
+    resp, err := dataClient.Append(context.Background(), appendRequest)
+    if err != nil {
+        panic(err)
+    }
+    return resp.Gsn
+}
+
+/*
+ * Subscribes to records starting from global sequence number [gsn].
+ */
+func (c *Client) Subscribe(gsn int32) {
+    // TODO
+}
+
+/*
+ * Deletes records before global sequence number [gsn].
+ */
+func (c *Client) Trim(gsn int32) {
+    // TODO
+}
+
+/*
+ * Queries the discovery service and returns the unique client id assigned.
+ */
+func assignClientId() int32 {
+    // TODO: query discovery service to obtain client id in order to ensure that
+    // client ids are unique
+    return 0
+}
+
+/*
+ * Queries the discovery service and returns the ports of the active data
+ * servers as a slice.
+ */
+func discoverServers(address string) []int32 {
+    var opts []grpc.DialOption
+    opts = append(opts, grpc.WithInsecure())
+    conn, err := grpc.Dial(address, opts...)
+    if err != nil {
+        panic(err)
+    }
+    defer conn.Close()
+
+    discoveryClient := discovery.NewDiscoveryClient(conn)
+    discoveryRequest := &discovery.DiscoverRequest{}
+    resp, err := discoveryClient.DiscoverServers(context.Background(), discoveryRequest)
+    if err != nil {
+        panic(err)
+    }
+    return resp.ServerAddresses
+}
+
+/*
+ * Given a slice of ports of the active data servers, selects and returns a
+ * single port based on the data placement policy.
+ */
+func appendPlacementPolicy(ports []int32) int32 {
+    if len(ports) == 0 {
+        panic("Failed to append: no active data servers discovered!")
+    }
+    return ports[0] // TODO: select port based on data placement policy
 }
