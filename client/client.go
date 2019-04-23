@@ -1,4 +1,4 @@
-/* Package client provides clients with the ability to interact with the Scalog API. */
+/*Package client provides clients with the ability to interact with the Scalog API. */
 package client
 
 import (
@@ -14,9 +14,9 @@ import (
 )
 
 /*
- * Struct that carries the meta-data necessary for a client to interact with the
- * Scalog API. Clients should initialize a new instance of this struct with the
- * newClient() function.
+ * Client is a struct that carries the meta-data necessary for a client to interact
+ * with the Scalog API. Clients should initialize a new instance of this struct with
+ * the newClient() function.
  */
 type Client struct {
 	// Integer serving as unique client id
@@ -38,7 +38,7 @@ type Callback func(int32, string, error)
  */
 func NewClient() *Client {
 	return &Client{
-		cid: assignClientId(),
+		cid: assignClientID(),
 		csn: 0,
 		mu:  sync.RWMutex{},
 	}
@@ -97,7 +97,7 @@ func (c *Client) Trim(gsn int32) {
 /*
  * Queries the discovery service and returns the unique client id assigned.
  */
-func assignClientId() int32 {
+func assignClientID() int32 {
 	// TODO: query discovery service to obtain client id in order to ensure that
 	// client ids are unique
 	return rand.Int31()
