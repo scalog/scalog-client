@@ -50,9 +50,9 @@ func NewClient() *Client {
 func (c *Client) Append(r string) (int32, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
-	ports := discoverServers("130.127.133.24:32403") // TODO: move port to config file
-	port := appendPlacementPolicy(ports)
-	conn, err := grpc.Dial(fmt.Sprintf("130.127.133.24:%d", port), opts...)
+	addresses := discoverServers("130.127.133.24:32403") // TODO: move port to config file
+	address := appendPlacementPolicy(addresses)
+	conn, err := grpc.Dial(addressToString(address), opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -78,9 +78,9 @@ func (c *Client) Append(r string) (int32, error) {
  * Subscribes to records starting from global sequence number [gsn].
  */
 func (c *Client) Subscribe(gsn int32, callback Callback) {
-	ports := discoverServers("130.127.133.24:32403") // TODO: move port to config file
-	for _, port := range ports {
-		go c.subscribe(port, gsn, callback)
+	addresses := discoverServers("130.127.133.24:32403") // TODO: move port to config file
+	for _, address := range addresses {
+		go c.subscribe(address, gsn, callback)
 	}
 }
 
@@ -88,9 +88,9 @@ func (c *Client) Subscribe(gsn int32, callback Callback) {
  * Deletes records before global sequence number [gsn].
  */
 func (c *Client) Trim(gsn int32) {
-	ports := discoverServers("130.127.133.24:32403") // TODO: move port to config file
-	for _, port := range ports {
-		go c.trim(port, gsn)
+	addresses := discoverServers("130.127.133.24:32403") // TODO: move port to config file
+	for _, address := range addresses {
+		go c.trim(address, gsn)
 	}
 }
 
@@ -126,14 +126,14 @@ func discoverServers(address string) []*discovery.DataServerAddress {
 }
 
 /*
- * Given a slice of ports of the active data servers, selects and returns a
- * single port based on the data placement policy.
+ * Given a slice of addresses of the active data servers, selects and returns a
+ * single address based on the data placement policy.
  */
-func appendPlacementPolicy(ports []int32) int32 {
-	if len(ports) == 0 {
+func appendPlacementPolicy(addresses []*discovery.DataServerAddress) *discovery.DataServerAddress {
+	if len(addresses) == 0 {
 		panic("Failed to append: no active data servers discovered!")
 	}
-	return ports[rand.Intn(len(ports))] // TODO: select port based on data placement policy
+	return addresses[rand.Intn(len(addresses))] // TODO: select port based on data placement policy
 }
 
 /*
@@ -141,10 +141,10 @@ func appendPlacementPolicy(ports []int32) int32 {
  * data server to report ordered records with gsn > [gsn], and passes those
  * arguments to the [callback] function.
  */
-func (c *Client) subscribe(port int32, gsn int32, callback Callback) {
+func (c *Client) subscribe(address *discovery.DataServerAddress, gsn int32, callback Callback) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
-	conn, err := grpc.Dial(fmt.Sprintf("130.127.133.24:%d", port), opts...)
+	conn, err := grpc.Dial(addressToString(address), opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -175,10 +175,10 @@ func (c *Client) subscribe(port int32, gsn int32, callback Callback) {
  * Creates a stream to the data server on port [port] and requests that
  * all records with gsn < [gsn] be deleted.
  */
-func (c *Client) trim(port int32, gsn int32) {
+func (c *Client) trim(address *discovery.DataServerAddress, gsn int32) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
-	conn, err := grpc.Dial(fmt.Sprintf("130.127.133.24:%d", port), opts...)
+	conn, err := grpc.Dial(addressToString(address), opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -190,4 +190,8 @@ func (c *Client) trim(port int32, gsn int32) {
 	}
 	dataClient.Trim(context.Background(), r)
 	// No response expected
+}
+
+func addressToString(address *discovery.DataServerAddress) string {
+	return fmt.Sprintf("%s:%d", address.Ip, address.Port)
 }
