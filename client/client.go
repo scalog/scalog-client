@@ -100,7 +100,7 @@ func (c *Client) Trim(gsn int32) {
 func assignClientId() int32 {
 	// TODO: query discovery service to obtain client id in order to ensure that
 	// client ids are unique
-	return 0
+	return rand.Int31()
 }
 
 /*
