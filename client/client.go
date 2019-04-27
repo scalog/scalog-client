@@ -199,8 +199,10 @@ func (c *Client) subscribe(address *discovery.DataServerAddress, gsn int32) {
 			Gsn:    in.Gsn,
 			Record: in.Record,
 		}
+		if in.Gsn == c.nextGsn {
+			c.respond()
+		}
 		c.smu.Unlock()
-		c.respond()
 	}
 }
 
@@ -209,14 +211,12 @@ Responds to client with [SubscribeResponse] in order of global sequence number
 if possible.
 */
 func (c *Client) respond() {
-	c.cmu.Lock()
 	for c.ss.Contains(int64(c.nextGsn)) { // TODO: remove type casting once gsn are int64
 		c.sc <- c.sm[c.nextGsn]
 		c.ss.Remove(int64(c.nextGsn)) // TODO: remove type casting once gsn are int64
 		delete(c.sm, c.nextGsn)
 		c.nextGsn = c.nextGsn + 1
 	}
-	c.cmu.Unlock()
 }
 
 /*
