@@ -10,6 +10,7 @@ import (
 
 	data "github.com/scalog/scalog/data/messaging"
 	discovery "github.com/scalog/scalog/discovery/rpc"
+	set64 "github.com/scalog/scalog/pkg/set64"
 	"google.golang.org/grpc"
 )
 
@@ -37,6 +38,7 @@ type Callback func(int32, string, error)
  * Initializes and returns a new instance of [Client] with a unique client id.
  */
 func NewClient() *Client {
+	set64.NewSet64()
 	return &Client{
 		cid: assignClientID(),
 		csn: 0,
