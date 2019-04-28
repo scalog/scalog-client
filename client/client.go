@@ -5,14 +5,24 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"math/rand"
 	"sync"
+
+	"gopkg.in/yaml.v2"
 
 	data "github.com/scalog/scalog/data/messaging"
 	discovery "github.com/scalog/scalog/discovery/rpc"
 	set64 "github.com/scalog/scalog/pkg/set64"
 	"google.golang.org/grpc"
 )
+
+/*
+config is a struct that contains the configuration data specified in [config.yaml].
+*/
+type config struct {
+	DiscoveryAddress string `yaml:"discovery-address"`
+}
 
 /*
 SubscribeResponse is a struct that represents a record [Record] that has been ordered
@@ -45,6 +55,8 @@ type Client struct {
 	smu sync.RWMutex
 	// Channel to send subscribe responses to the client
 	sc chan SubscribeResponse
+	// Configuration as defined in config.yaml for client library
+	conf *config
 }
 
 /*
@@ -60,6 +72,7 @@ func NewClient() *Client {
 		sm:      make(map[int32]SubscribeResponse),
 		smu:     sync.RWMutex{},
 		sc:      make(chan SubscribeResponse),
+		conf:    parseConfig(),
 	}
 }
 
@@ -70,7 +83,7 @@ Note: this is a blocking function!
 func (c *Client) Append(r string) (int32, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
-	addresses := discoverServers("130.127.133.24:32403") // TODO: move address to config file
+	addresses := discoverServers(c.conf.DiscoveryAddress)
 	address := applyAppendPlacementPolicy(addresses)
 	conn, err := grpc.Dial(addressToString(address), opts...)
 	if err != nil {
@@ -102,7 +115,7 @@ func (c *Client) Subscribe(gsn int32) chan SubscribeResponse {
 	c.cmu.Lock()
 	c.nextGsn = gsn
 	c.cmu.Unlock()
-	addresses := discoverServers("130.127.133.24:32403") // TODO: move address to config file
+	addresses := discoverServers(c.conf.DiscoveryAddress)
 	for _, address := range addresses {
 		go c.subscribe(address, gsn)
 	}
@@ -113,7 +126,7 @@ func (c *Client) Subscribe(gsn int32) chan SubscribeResponse {
 Trim deletes records before global sequence number [gsn].
 */
 func (c *Client) Trim(gsn int32) {
-	addresses := discoverServers("130.127.133.24:32403") // TODO: move address to config file
+	addresses := discoverServers(c.conf.DiscoveryAddress)
 	for _, address := range addresses {
 		go c.trim(address, gsn)
 	}
@@ -125,6 +138,22 @@ Note: uniqueness is not guaranteed!
 */
 func assignClientID() int32 {
 	return rand.Int31()
+}
+
+/*
+Parse config file and initialize an instance of [config].
+*/
+func parseConfig() *config {
+	var conf config
+	file, err := ioutil.ReadFile("../config.yaml")
+	if err != nil {
+		panic(err)
+	}
+	err = yaml.Unmarshal([]byte(file), &conf)
+	if err != nil {
+		panic(err)
+	}
+	return &conf
 }
 
 /*
