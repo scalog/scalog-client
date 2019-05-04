@@ -82,7 +82,7 @@ Note: this is a blocking function!
 */
 func (c *Client) Append(r string) (int32, error) {
 	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
+	opts = append(opts, grpc.WithInsecure(), grpc.WithBlock())
 	addresses := discoverServers(c.conf.DiscoveryAddress)
 	address := applyAppendPlacementPolicy(addresses)
 	conn, err := grpc.Dial(addressToString(address), opts...)
@@ -222,6 +222,9 @@ func (c *Client) subscribe(address *discovery.DataServerAddress, gsn int32) {
 			panic(err)
 		}
 
+		if (in.Gsn < c.nextGsn) {
+			return
+		}
 		c.smu.Lock()
 		c.ss.Add(int64(in.Gsn)) // TODO: remove type casting once gsn are int64
 		c.sm[in.Gsn] = SubscribeResponse{
