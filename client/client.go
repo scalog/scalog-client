@@ -83,9 +83,9 @@ Note: this is a blocking function!
 func (c *Client) Append(r string) (int32, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure(), grpc.WithBlock())
-	addresses := discoverServers(c.conf.DiscoveryAddress)
-	address := applyAppendPlacementPolicy(addresses)
-	conn, err := grpc.Dial(addressToString(address), opts...)
+	// addresses := discoverServers(c.conf.DiscoveryAddress)
+	// address := applyAppendPlacementPolicy(addresses)
+	conn, err := grpc.Dial("130.127.133.35:30946", opts...) // TODO: temporarily hard-coded due to bug in discovery
 	if err != nil {
 		panic(err)
 	}
@@ -222,7 +222,7 @@ func (c *Client) subscribe(address *discovery.DataServerAddress, gsn int32) {
 			panic(err)
 		}
 
-		if (in.Gsn < c.nextGsn) {
+		if in.Gsn < c.nextGsn {
 			return
 		}
 		c.smu.Lock()
