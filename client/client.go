@@ -93,7 +93,7 @@ Note: this is a blocking function!
 func (c *Client) Append(r string) (int32, error) {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
-	addresses := discoverServers(c.conf)
+	addresses := discoverServers(c.conf.DiscoveryAddress)
 	address := applyAppendPlacementPolicy(addresses)
 	// conn, err := grpc.Dial(addressToString(address), opts...)
 	// TODO: temporary hot fix due to bug in discovery service
@@ -127,7 +127,7 @@ func (c *Client) Subscribe(gsn int32) chan SubscribeResponse {
 	c.cmu.Lock()
 	c.nextGsn = gsn
 	c.cmu.Unlock()
-	addresses := discoverServers(c.conf)
+	addresses := discoverServers(c.conf.DiscoveryAddress)
 	for _, address := range addresses {
 		// go c.subscribe(address, gsn)
 		// TODO: temporary hot fix due to bug in discovery service
@@ -143,7 +143,7 @@ func (c *Client) Subscribe(gsn int32) chan SubscribeResponse {
 Trim deletes records before global sequence number [gsn].
 */
 func (c *Client) Trim(gsn int32) {
-	addresses := discoverServers(c.conf)
+	addresses := discoverServers(c.conf.DiscoveryAddress)
 	for _, address := range addresses {
 		// go c.trim(address, gsn)
 		// TODO: temporary hot fix due to bug in discovery service
@@ -183,10 +183,10 @@ func parseConfig() *config {
 Queries the discovery service and returns a slice of the addresses of all active
 data servers.
 */
-func discoverServers(conf *config) []*discovery.DataServerAddress {
+func discoverServers(discoveryAddress discoveryAddress) []*discovery.DataServerAddress {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
-	address := fmt.Sprintf("%s:%d", conf.DiscoveryAddress.Ip, conf.DiscoveryAddress.Port)
+	address := fmt.Sprintf("%s:%d", discoveryAddress.Ip, discoveryAddress.Port)
 	conn, err := grpc.Dial(address, opts...)
 	if err != nil {
 		panic(err)
