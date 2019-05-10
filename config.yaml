@@ -1,1 +1,3 @@
-discovery-address: "130.127.133.35:30823"
+discovery-address:
+  ip:   "130.127.133.35"
+  port: 30399

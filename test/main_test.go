@@ -18,11 +18,13 @@ func TestClientAppend(t *testing.T) {
 
 func TestClientSubscribe(t *testing.T) {
 	client := client.NewClient()
-	c := client.Subscribe(0)
-	_, err := client.Append("Hello, World!")
+	c := client.Subscribe(1)
+	appendResp, err := client.Append("Hello, World!")
+	fmt.Println(fmt.Sprintf("Append responded with global sequence number: %d", appendResp))
 	if err != nil {
 		t.Errorf(err.Error())
 	}
-	resp := <-c
-	fmt.Println(fmt.Sprintf("Subscribe responded with global sequence number: %d", resp.Gsn))
+	for resp := range c {
+		fmt.Println(fmt.Sprintf("Subscribe responded with global sequence number: %d", resp.Gsn))
+	}
 }

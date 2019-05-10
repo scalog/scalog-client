@@ -8,6 +8,7 @@ import (
 	"io/ioutil"
 	"math/rand"
 	"sync"
+	"time"
 
 	"gopkg.in/yaml.v2"
 
@@ -18,10 +19,19 @@ import (
 )
 
 /*
+discoveryAddress is a struct that contains the configuration data specified in [config.yaml]
+for the discovery address.
+*/
+type discoveryAddress struct {
+	Ip   string `yaml:"ip"`
+	Port int32  `yaml:"port"`
+}
+
+/*
 config is a struct that contains the configuration data specified in [config.yaml].
 */
 type config struct {
-	DiscoveryAddress string `yaml:"discovery-address"`
+	DiscoveryAddress discoveryAddress `yaml:"discovery-address"`
 }
 
 /*
@@ -82,10 +92,12 @@ Note: this is a blocking function!
 */
 func (c *Client) Append(r string) (int32, error) {
 	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure(), grpc.WithBlock())
-	// addresses := discoverServers(c.conf.DiscoveryAddress)
-	// address := applyAppendPlacementPolicy(addresses)
-	conn, err := grpc.Dial("130.127.133.35:30946", opts...) // TODO: temporarily hard-coded due to bug in discovery
+	opts = append(opts, grpc.WithInsecure())
+	addresses := discoverServers(c.conf)
+	address := applyAppendPlacementPolicy(addresses)
+	// conn, err := grpc.Dial(addressToString(address), opts...)
+	// TODO: temporary hot fix due to bug in discovery service
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.conf.DiscoveryAddress.Ip, address.Port), opts...)
 	if err != nil {
 		panic(err)
 	}
@@ -115,9 +127,14 @@ func (c *Client) Subscribe(gsn int32) chan SubscribeResponse {
 	c.cmu.Lock()
 	c.nextGsn = gsn
 	c.cmu.Unlock()
-	addresses := discoverServers(c.conf.DiscoveryAddress)
+	addresses := discoverServers(c.conf)
 	for _, address := range addresses {
-		go c.subscribe(address, gsn)
+		// go c.subscribe(address, gsn)
+		// TODO: temporary hot fix due to bug in discovery service
+		go c.subscribe(&discovery.DataServerAddress{
+			Ip:   c.conf.DiscoveryAddress.Ip,
+			Port: address.Port,
+		}, gsn)
 	}
 	return c.sc
 }
@@ -126,9 +143,14 @@ func (c *Client) Subscribe(gsn int32) chan SubscribeResponse {
 Trim deletes records before global sequence number [gsn].
 */
 func (c *Client) Trim(gsn int32) {
-	addresses := discoverServers(c.conf.DiscoveryAddress)
+	addresses := discoverServers(c.conf)
 	for _, address := range addresses {
-		go c.trim(address, gsn)
+		// go c.trim(address, gsn)
+		// TODO: temporary hot fix due to bug in discovery service
+		go c.trim(&discovery.DataServerAddress{
+			Ip:   c.conf.DiscoveryAddress.Ip,
+			Port: address.Port,
+		}, gsn)
 	}
 }
 
@@ -137,7 +159,8 @@ Returns a randomly generated 31-bit integer as int32.
 Note: uniqueness is not guaranteed!
 */
 func assignClientID() int32 {
-	return rand.Int31()
+	s := rand.NewSource(time.Now().UnixNano())
+	return rand.New(s).Int31()
 }
 
 /*
@@ -160,9 +183,10 @@ func parseConfig() *config {
 Queries the discovery service and returns a slice of the addresses of all active
 data servers.
 */
-func discoverServers(address string) []*discovery.DataServerAddress {
+func discoverServers(conf *config) []*discovery.DataServerAddress {
 	var opts []grpc.DialOption
 	opts = append(opts, grpc.WithInsecure())
+	address := fmt.Sprintf("%s:%d", conf.DiscoveryAddress.Ip, conf.DiscoveryAddress.Port)
 	conn, err := grpc.Dial(address, opts...)
 	if err != nil {
 		panic(err)
@@ -187,7 +211,8 @@ func applyAppendPlacementPolicy(addresses []*discovery.DataServerAddress) *disco
 	if len(addresses) == 0 {
 		panic("Failed to append: no active data servers discovered!")
 	}
-	return addresses[rand.Intn(len(addresses))] // TODO: select address based on data placement policy
+	s := rand.NewSource(time.Now().UnixNano())
+	return addresses[rand.New(s).Intn(len(addresses))] // TODO: select address based on data placement policy
 }
 
 /*
