@@ -1,15 +1,14 @@
-package test
+package lib
 
 import (
 	"fmt"
 	"testing"
 
-	"github.com/scalog/scalog-client/client"
 	"github.com/scalog/scalog/pkg/set64"
 )
 
 func TestSingleAppend(t *testing.T) {
-	client := client.NewClient()
+	client := NewClient()
 	gsn, err := client.Append("Hello, World!")
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -20,7 +19,7 @@ func TestSingleAppend(t *testing.T) {
 }
 
 func TestMultipleAppend(t *testing.T) {
-	client := client.NewClient()
+	client := NewClient()
 	set := set64.NewSet64()
 	for i := 1; i <= 5; i++ {
 		gsn, err := client.Append(fmt.Sprintf("Appending %d", i))
@@ -40,7 +39,7 @@ func TestMultipleAppend(t *testing.T) {
 func TestMultipleClientsAppend(t *testing.T) {
 	set := set64.NewSet64()
 	for i := 1; i <= 5; i++ {
-		client := client.NewClient()
+		client := NewClient()
 		gsn, err := client.Append(fmt.Sprintf("Appending %d", i))
 		if err != nil {
 			t.Fatalf(err.Error())
@@ -56,7 +55,7 @@ func TestMultipleClientsAppend(t *testing.T) {
 }
 
 func TestSimpleSubscribe(t *testing.T) {
-	client := client.NewClient()
+	client := NewClient()
 	c := client.Subscribe(1)
 	_, err := client.Append("Hello, World!")
 	if err != nil {
@@ -69,7 +68,7 @@ func TestSimpleSubscribe(t *testing.T) {
 }
 
 func TestMultipleSubscribe(t *testing.T) {
-	client := client.NewClient()
+	client := NewClient()
 	c := client.Subscribe(1)
 	set := set64.NewSet64()
 	for i := 1; i <= 5; i++ {

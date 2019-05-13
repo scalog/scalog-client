@@ -15,9 +15,9 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+
+	"github.com/scalog/scalog-client/test"
 )
 
 // testCmd represents the test command
@@ -26,7 +26,7 @@ var testCmd = &cobra.Command{
 	Short: "Integrated test",
 	Long:  `Integrated test`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("test called")
+		test.NewBench(num, size).Start()
 	},
 }
 
