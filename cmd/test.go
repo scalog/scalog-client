@@ -26,7 +26,7 @@ var testCmd = &cobra.Command{
 	Short: "Integrated test",
 	Long:  `Integrated test`,
 	Run: func(cmd *cobra.Command, args []string) {
-		test.NewBench(num, size).Start()
+		test.NewBench().Start()
 	},
 }
 
