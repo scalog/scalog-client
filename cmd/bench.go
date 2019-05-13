@@ -17,6 +17,8 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/scalog/scalog-client/bench"
+
 	"github.com/spf13/cobra"
 )
 
@@ -26,7 +28,9 @@ var benchCmd = &cobra.Command{
 	Short: "Scalog client-side benchmarks",
 	Long:  `Scalog client-side benchmarks`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("bench called")
+		num := cmd.Flags().Lookup("num")
+		size := cmd.Flags().Lookup("size")
+		bench.NewBench(num, size).Start()
 	},
 }
 
@@ -41,5 +45,6 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	// benchCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+	benchCmd.Flags().IntP("num", "n", 1000, "Number of append operations")
+	benchCmd.Flags().IntP("size", "s", 4096, "Size of each append operation")
 }

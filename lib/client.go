@@ -1,5 +1,5 @@
 // Package client provides clients with the ability to interact with the Scalog API.
-package client
+package lib
 
 import (
 	"context"
