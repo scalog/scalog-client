@@ -3,7 +3,6 @@ go:
   - 1.12.x
   - 1.10.x
   - tip
-before_install: cd client
 script: go build
 branches:
   only:
