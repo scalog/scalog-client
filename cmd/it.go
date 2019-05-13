@@ -15,9 +15,9 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
+
+	"github.com/scalog/scalog-client/it"
 )
 
 // itCmd represents the it command
@@ -26,7 +26,7 @@ var itCmd = &cobra.Command{
 	Short: "Scalog interactive client",
 	Long:  `Scalog interactive client`,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Println("it called")
+		it.NewIt().Start()
 	},
 }
 
