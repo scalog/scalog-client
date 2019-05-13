@@ -4,17 +4,17 @@ import (
 	clientlib "github.com/scalog/scalog-client/lib"
 )
 
-type Bench struct {
+type Test struct {
 	client *clientlib.Client
 }
 
-func NewBench() *Bench {
-	b := &Bench{}
-	b.client = clientlib.NewClient()
-	return b
+func NewTest() *Test {
+	t := &Test{}
+	t.client = clientlib.NewClient()
+	return t
 }
 
-func (b *Bench) Start() error {
+func (t *Test) Start() error {
 	// TODO: implement the test
 	return nil
 }
