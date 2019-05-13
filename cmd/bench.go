@@ -15,8 +15,6 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/scalog/scalog-client/bench"
 
 	"github.com/spf13/cobra"
@@ -28,8 +26,14 @@ var benchCmd = &cobra.Command{
 	Short: "Scalog client-side benchmarks",
 	Long:  `Scalog client-side benchmarks`,
 	Run: func(cmd *cobra.Command, args []string) {
-		num := cmd.Flags().Lookup("num")
-		size := cmd.Flags().Lookup("size")
+		num, err := cmd.Flags().GetInt32("num")
+		if err != nil {
+			panic(err)
+		}
+		size, err := cmd.Flags().GetInt32("size")
+		if err != nil {
+			panic(err)
+		}
 		bench.NewBench(num, size).Start()
 	},
 }

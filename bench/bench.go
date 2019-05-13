@@ -6,24 +6,28 @@ import (
 )
 
 type Bench struct {
-	num    uint32
-	size   uint32
+	num    int32
+	size   int32
 	client *clientlib.Client
-	data   []byte
+	data   string
 }
 
-func NewBench(num, size uint32) *Bench {
-	b := &Bench{num, size}
-	b.client = NewClient()
-	b.data = make([]byte, b.size)
+func NewBench(num, size int32) *Bench {
+	b := &Bench{num: num, size: size}
+	b.client = clientlib.NewClient()
+	b.data = string(make([]byte, b.size))
 	return b
 }
 
-func (b *bench) Start() (string, error) {
-	for i := uint32(0); i < b.num; i++ {
+func (b *Bench) Start() error {
+	for i := int32(0); i < b.num; i++ {
 		n, err := b.client.Append(b.data)
 		if n != b.size {
-			log.Errorf("Append returned length error: expect %d, get %d", b.size, n)
+			log.Printf("Append returned length error: expect %d, get %d", b.size, n)
+		}
+		if err != nil {
+			return err
 		}
 	}
+	return nil
 }
