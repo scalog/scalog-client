@@ -34,7 +34,10 @@ var benchCmd = &cobra.Command{
 		if err != nil {
 			panic(err)
 		}
-		bench.NewBench(num, size).Start()
+		err = bench.NewBench(num, size).Start()
+		if err != nil {
+			panic(err)
+		}
 	},
 }
 

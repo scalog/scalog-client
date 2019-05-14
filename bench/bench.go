@@ -1,8 +1,10 @@
 package bench
 
 import (
+	"errors"
+	"fmt"
+
 	clientlib "github.com/scalog/scalog-client/lib"
-	log "github.com/scalog/scalog/logger"
 )
 
 type Bench struct {
@@ -22,11 +24,11 @@ func NewBench(num, size int32) *Bench {
 func (b *Bench) Start() error {
 	for i := int32(0); i < b.num; i++ {
 		n, err := b.client.Append(b.data)
-		if n != b.size {
-			log.Printf("Append returned length error: expect %d, get %d", b.size, n)
-		}
 		if err != nil {
 			return err
+		}
+		if n != b.size {
+			return errors.New(fmt.Sprintf("Append returned length error: expect %d, get %d", b.size, n))
 		}
 	}
 	return nil
