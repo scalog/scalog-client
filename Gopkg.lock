@@ -84,12 +84,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:2bde1e6799485df495c30d940339ae4c402ffc9bd180a3d52e44ed3bcaf89bba"
+  digest = "1:e91d70fb5a28b73a0849d085e4ae9b90b8fc898308931c1d7b4ba1b813fde7ec"
   name = "github.com/scalog/scalog"
   packages = [
     "data/messaging",
     "discovery/rpc",
-    "logger",
     "pkg/set64",
   ]
   pruneopts = "UT"
@@ -258,7 +257,6 @@
     "github.com/mitchellh/go-homedir",
     "github.com/scalog/scalog/data/messaging",
     "github.com/scalog/scalog/discovery/rpc",
-    "github.com/scalog/scalog/logger",
     "github.com/scalog/scalog/pkg/set64",
     "github.com/spf13/cobra",
     "github.com/spf13/viper",
