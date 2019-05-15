@@ -1,7 +1,6 @@
 package bench
 
 import (
-	"errors"
 	"fmt"
 
 	clientlib "github.com/scalog/scalog-client/lib"
@@ -28,7 +27,7 @@ func (b *Bench) Start() error {
 			return err
 		}
 		if n != b.size {
-			return errors.New(fmt.Sprintf("Append returned length error: expect %d, get %d", b.size, n))
+			return fmt.Errorf("Append returned length error: expect %d, get %d", b.size, n)
 		}
 	}
 	return nil

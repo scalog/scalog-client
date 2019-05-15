@@ -97,6 +97,7 @@ func (c *Client) Append(r string) (int32, error) {
 	address := applyAppendPlacementPolicy(addresses)
 	// conn, err := grpc.Dial(addressToString(address), opts...)
 	// TODO: temporary hot fix due to bug in discovery service
+	// TODO: don't dial for every operation. Save the connection and reuse it
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.conf.DiscoveryAddress.Ip, address.Port), opts...)
 	if err != nil {
 		panic(err)

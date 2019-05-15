@@ -34,7 +34,10 @@ func (it *It) Start() error {
 		cmdString = strings.TrimSuffix(cmdString, "\n")
 		cmdString = strings.Trim(cmdString, " ")
 		cmd := regex.Split(cmdString, -1)
-		if len(cmd) != 2 {
+		if cmd[0] == "quit" || cmd[0] == "exit" {
+			break
+		}
+		if len(cmd) < 2 {
 			fmt.Fprintln(os.Stderr, "Command error")
 			continue
 		}
