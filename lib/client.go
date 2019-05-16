@@ -72,7 +72,7 @@ func NewClient() (*Client, error) {
 		clientID:         assignClientID(),
 		nextCsn:          0,
 		appendMu:         sync.RWMutex{},
-		nextGsn:          -1,
+		nextGsn:          0,
 		committedRecords: make(map[int32]CommittedRecord),
 		subscribeMu:      sync.RWMutex{},
 		subscribeChan:    make(chan CommittedRecord),
@@ -102,10 +102,10 @@ func (c *Client) AppendToShard(record string) (int32, int32, error) {
 	}
 	server := c.shardPolicy(servers, record)
 	opts := []grpc.DialOption{grpc.WithInsecure()}
-	// conn, err := grpc.Dial(getAddressOfServer(server), opts...)
 	// TODO: temporary fix due to discovery service returning server's cluster IP
+	server.Ip = c.config.DiscoveryAddress.IP
 	// TODO: don't dial for every operation. Save the connection and reuse it
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.config.DiscoveryAddress.IP, server.Port), opts...)
+	conn, err := grpc.Dial(getAddressOfServer(server), opts...)
 	if err != nil {
 		return -1, -1, err
 	}
@@ -137,15 +137,9 @@ func (c *Client) Subscribe(gsn int32) (chan CommittedRecord, error) {
 	c.nextGsn = gsn
 	c.subscribeMu.Unlock()
 	for _, server := range servers {
-		// go c.subscribeToServer(server, gsn)
 		// TODO: temporary fix due to discovery service returning server's cluster IP
-		go c.subscribeToServer(
-			&discovery.DataServer{
-				Ip:   c.config.DiscoveryAddress.IP,
-				Port: server.Port,
-			},
-			gsn,
-		)
+		server.Ip = c.config.DiscoveryAddress.IP
+		go c.subscribeToServer(server, gsn)
 	}
 	return c.subscribeChan, nil
 }
@@ -158,6 +152,8 @@ func (c *Client) ReadRecord(gsn int32, shardID int32) (string, error) {
 	}
 	for _, server := range servers {
 		if server.ShardID == shardID {
+			// TODO: temporary fix due to discovery service returning server's cluster IP
+			server.Ip = c.config.DiscoveryAddress.IP
 			record, err := c.readFromServer(server, gsn)
 			if err != nil {
 				return "", err
@@ -175,15 +171,9 @@ func (c *Client) Trim(gsn int32) error {
 		return err
 	}
 	for _, server := range servers {
-		// go c.trim(server, gsn)
 		// TODO: temporary fix due to discovery service returning server's cluster IP
-		go c.trimFromServer(
-			&discovery.DataServer{
-				Ip:   c.config.DiscoveryAddress.IP,
-				Port: server.Port,
-			},
-			gsn,
-		)
+		server.Ip = c.config.DiscoveryAddress.IP
+		go c.trimFromServer(server, gsn)
 	}
 	return nil
 }
@@ -225,9 +215,7 @@ func parseConfig() (*config, error) {
 // order to the subscribeChan
 func (c *Client) subscribeToServer(server *discovery.DataServer, gsn int32) error {
 	opts := []grpc.DialOption{grpc.WithInsecure()}
-	// conn, err := grpc.Dial(getAddressOfServer(server), opts...)
-	// TODO: temporary fix due to discovery service returning server's cluster IP
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.config.DiscoveryAddress.IP, server.Port), opts...)
+	conn, err := grpc.Dial(getAddressOfServer(server), opts...)
 	if err != nil {
 		return err
 	}
@@ -274,9 +262,7 @@ func (c *Client) respond() {
 // server.
 func (c *Client) trimFromServer(server *discovery.DataServer, gsn int32) error {
 	opts := []grpc.DialOption{grpc.WithInsecure()}
-	// conn, err := grpc.Dial(getAddressOfServer(server), opts...)
-	// TODO: temporary fix due to discovery service returning server's cluster IP
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.config.DiscoveryAddress.IP, server.Port), opts...)
+	conn, err := grpc.Dial(getAddressOfServer(server), opts...)
 	if err != nil {
 		return err
 	}
@@ -290,7 +276,7 @@ func (c *Client) trimFromServer(server *discovery.DataServer, gsn int32) error {
 // readFromServer reads a record with a global sequence number from a server.
 func (c *Client) readFromServer(server *discovery.DataServer, gsn int32) (string, error) {
 	opts := []grpc.DialOption{grpc.WithInsecure()}
-	conn, err := grpc.Dial(c.config.DiscoveryAddress.stats(), opts...)
+	conn, err := grpc.Dial(getAddressOfServer(server), opts...)
 	if err != nil {
 		return "", err
 	}
