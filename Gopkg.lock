@@ -84,15 +84,14 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:4c8068110c8b4d631aab23575fc42227f619b41073b97d923f3bea10e8ee5ae8"
+  digest = "1:bb91612a26e5a5229dd37b1d5dc5ec1cd3ca54d7e8bce78ce1ebcfadfab526cd"
   name = "github.com/scalog/scalog"
   packages = [
     "data/messaging",
     "discovery/rpc",
-    "pkg/set64",
   ]
   pruneopts = "UT"
-  revision = "94866dc4cb32b9fef192e19919cae98be115a5a1"
+  revision = "5eed18b5dfb187242d331d54a28a90318a8c7586"
 
 [[projects]]
   digest = "1:bb495ec276ab82d3dd08504bbc0594a65de8c3b22c6f2aaa92d05b73fbf3a82e"
@@ -166,7 +165,7 @@
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "UT"
-  revision = "cab07311ab81fc7f180fddf7410b604373b20a00"
+  revision = "61b9204099cb1bebc803c9ffb9b2d3acd9d457d9"
 
 [[projects]]
   digest = "1:8d8faad6b12a3a4c819a3f9618cb6ee1fa1cfc33253abeeea8b55336721e3405"
@@ -199,7 +198,7 @@
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "995ef27e003f584103ecdd0f98e1a0cc9cbf3395"
+  revision = "bb713bdc0e5239f2b68e560efbe1c701a6fe78f9"
 
 [[projects]]
   digest = "1:707c3a5d10ed430ea767d73df122d9eb3dfb6312bbacc9f2e39204390686d1d0"
@@ -257,7 +256,6 @@
     "github.com/mitchellh/go-homedir",
     "github.com/scalog/scalog/data/messaging",
     "github.com/scalog/scalog/discovery/rpc",
-    "github.com/scalog/scalog/pkg/set64",
     "github.com/spf13/cobra",
     "github.com/spf13/viper",
     "google.golang.org/grpc",

@@ -27,7 +27,7 @@ type CommittedRecord struct {
 }
 
 // ShardPolicy determines which records are appended to which shards.
-type ShardPolicy func(servers []*discovery.DataServerAddress, record string) (server *discovery.DataServerAddress)
+type ShardPolicy func(servers []*discovery.DataServer, record string) (server *discovery.DataServer)
 
 // Client interacts with the Scalog API.
 type Client struct {
@@ -137,7 +137,7 @@ func (c *Client) Subscribe(gsn int32) (chan CommittedRecord, error) {
 		// go c.subscribeToServer(server, gsn)
 		// TODO: temporary fix due to discovery service returning server's cluster IP
 		go c.subscribeToServer(
-			&discovery.DataServerAddress{
+			&discovery.DataServer{
 				Ip:   c.config.DiscoveryAddress.IP,
 				Port: server.Port,
 			},
@@ -163,7 +163,7 @@ func (c *Client) Trim(gsn int32) error {
 		// go c.trim(server, gsn)
 		// TODO: temporary fix due to discovery service returning server's cluster IP
 		go c.trimFromServer(
-			&discovery.DataServerAddress{
+			&discovery.DataServer{
 				Ip:   c.config.DiscoveryAddress.IP,
 				Port: server.Port,
 			},
@@ -186,7 +186,7 @@ func assignClientID() int32 {
 }
 
 // defaultShardPolicy returns a random server.
-func defaultShardPolicy(servers []*discovery.DataServerAddress, record string) *discovery.DataServerAddress {
+func defaultShardPolicy(servers []*discovery.DataServer, record string) *discovery.DataServer {
 	seed := rand.NewSource(time.Now().UnixNano())
 	return servers[rand.New(seed).Intn(len(servers))]
 }
@@ -208,7 +208,7 @@ func parseConfig() (*config, error) {
 
 // subscribeToServer subscribes to a data server and sends CommittedRecords in
 // order to the subscribeChan
-func (c *Client) subscribeToServer(server *discovery.DataServerAddress, gsn int32) error {
+func (c *Client) subscribeToServer(server *discovery.DataServer, gsn int32) error {
 	opts := []grpc.DialOption{grpc.WithInsecure()}
 	// conn, err := grpc.Dial(getAddressOfServer(server), opts...)
 	// TODO: temporary fix due to discovery service returning server's cluster IP
@@ -257,7 +257,7 @@ func (c *Client) respond() {
 
 // trimFromServer deletes records before a global sequence number from a data
 // server.
-func (c *Client) trimFromServer(server *discovery.DataServerAddress, gsn int32) error {
+func (c *Client) trimFromServer(server *discovery.DataServer, gsn int32) error {
 	opts := []grpc.DialOption{grpc.WithInsecure()}
 	// conn, err := grpc.Dial(getAddressOfServer(server), opts...)
 	// TODO: temporary fix due to discovery service returning server's cluster IP
@@ -274,7 +274,7 @@ func (c *Client) trimFromServer(server *discovery.DataServerAddress, gsn int32) 
 
 // discoverServers queries the discovery service and returns the live data
 // servers.
-func (c *Client) discoverServers() ([]*discovery.DataServerAddress, error) {
+func (c *Client) discoverServers() ([]*discovery.DataServer, error) {
 	opts := []grpc.DialOption{grpc.WithInsecure()}
 	conn, err := grpc.Dial(c.config.DiscoveryAddress.stats(), opts...)
 	if err != nil {
@@ -291,7 +291,7 @@ func (c *Client) discoverServers() ([]*discovery.DataServerAddress, error) {
 }
 
 // getAddressOfServer returns the address of a server as a string.
-func getAddressOfServer(server *discovery.DataServerAddress) string {
+func getAddressOfServer(server *discovery.DataServer) string {
 	return fmt.Sprintf("%s:%d", server.Ip, server.Port)
 }
 
