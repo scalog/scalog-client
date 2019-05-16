@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/scalog/scalog/pkg/set64"
+
 	clientlib "github.com/scalog/scalog-client/lib"
 )
 
@@ -26,15 +28,20 @@ func NewBench(num, size int32) (*Bench, error) {
 }
 
 func (b *Bench) Start() error {
+	gsns := set64.NewSet64()
 	start := time.Now()
 	for i := int32(0); i < b.num; i++ {
-		_, err := b.client.Append(b.data)
+		gsn, err := b.client.Append(b.data)
 		if err != nil {
 			return err
 		}
+		gsns.Add(int64(gsn))
 	}
 	end := time.Now()
+	if int32(gsns.Size()) != b.num {
+		return fmt.Errorf("Benchmark failed: one or more records assigned identical global sequence numbers")
+	}
 	elapsed := end.Sub(start)
-	fmt.Printf("%d Append operations of %d bytes each elapsed: %d ms\n", b.num, b.size, elapsed)
+	fmt.Printf("Benchmark completed: %d append operations of %d bytes each elapsed %d ms\n", b.num, b.size, elapsed)
 	return nil
 }
