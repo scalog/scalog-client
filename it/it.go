@@ -90,6 +90,12 @@ func (it *It) Start() error {
 				continue
 			}
 			fmt.Fprintln(os.Stderr, "Trim result: {}")
+		} else if cmd[0] == "help" {
+			fmt.Fprintln(os.Stderr, "Supported commands:")
+			fmt.Fprintln(os.Stderr, "    append [record]")
+			fmt.Fprintln(os.Stderr, "    subscribe [gsn]")
+			fmt.Fprintln(os.Stderr, "    trim [gsn]")
+			fmt.Fprintln(os.Stderr, "    exit")
 		} else {
 			fmt.Fprintln(os.Stderr, "Command error: invalid command")
 		}
