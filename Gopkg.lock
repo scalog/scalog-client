@@ -84,7 +84,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:e91d70fb5a28b73a0849d085e4ae9b90b8fc898308931c1d7b4ba1b813fde7ec"
+  digest = "1:4c8068110c8b4d631aab23575fc42227f619b41073b97d923f3bea10e8ee5ae8"
   name = "github.com/scalog/scalog"
   packages = [
     "data/messaging",
@@ -92,7 +92,7 @@
     "pkg/set64",
   ]
   pruneopts = "UT"
-  revision = "d9d122d2c71a87228ba835a11854b94ac1123d33"
+  revision = "94866dc4cb32b9fef192e19919cae98be115a5a1"
 
 [[projects]]
   digest = "1:bb495ec276ab82d3dd08504bbc0594a65de8c3b22c6f2aaa92d05b73fbf3a82e"
@@ -147,7 +147,7 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:ba3cf4e71b3db902c6a219b58be3b6a2cb76bb0626016f5ffa5e3ab261c8cb53"
+  digest = "1:d74f0c0ed416a7a676ef391036a62ecb207b5057636666b3a364397b7b5af3aa"
   name = "golang.org/x/net"
   packages = [
     "http/httpguts",
@@ -158,15 +158,15 @@
     "trace",
   ]
   pruneopts = "UT"
-  revision = "4829fb13d2c62012c17688fa7f629f371014946d"
+  revision = "3ec19112720433827bbce8be9342797f5a6aaaf9"
 
 [[projects]]
   branch = "master"
-  digest = "1:157e5158a7f29d6633eed502880463aa43de3c36d451c7051591efd12f455ac8"
+  digest = "1:3851a6d548ec5a808e396408f03a30b8d05ef4426db7ad8688f639b2d88b47bd"
   name = "golang.org/x/sys"
   packages = ["unix"]
   pruneopts = "UT"
-  revision = "a129542de9ae0895210abff9c95d67a1f33cb93d"
+  revision = "cab07311ab81fc7f180fddf7410b604373b20a00"
 
 [[projects]]
   digest = "1:8d8faad6b12a3a4c819a3f9618cb6ee1fa1cfc33253abeeea8b55336721e3405"
@@ -195,11 +195,11 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:c3076e7defee87de1236f1814beb588f40a75544c60121e6eb38b3b3721783e2"
+  digest = "1:583a0c80f5e3a9343d33aea4aead1e1afcc0043db66fdf961ddd1fe8cd3a4faf"
   name = "google.golang.org/genproto"
   packages = ["googleapis/rpc/status"]
   pruneopts = "UT"
-  revision = "357c62f0e4bbba7e6cc403ae09edcf3e2b9028fe"
+  revision = "995ef27e003f584103ecdd0f98e1a0cc9cbf3395"
 
 [[projects]]
   digest = "1:707c3a5d10ed430ea767d73df122d9eb3dfb6312bbacc9f2e39204390686d1d0"
