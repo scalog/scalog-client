@@ -85,9 +85,20 @@ func NewClient() (*Client, error) {
 // Append appends a record to a shard based on the shard policy, and returns the
 // global sequence number assigned by Scalog.
 func (c *Client) Append(record string) (int32, error) {
-	servers, err := c.discoverServers()
+	gsn, _, err := c.AppendToShard(record)
 	if err != nil {
 		return -1, err
+	}
+	return gsn, nil
+}
+
+// AppendToShard appends a record to a shard based on the shard policy, and
+// returns the global sequence number assigned by Scalog and the shard's
+// identifier.
+func (c *Client) AppendToShard(record string) (int32, int32, error) {
+	servers, err := c.discoverServers()
+	if err != nil {
+		return -1, -1, err
 	}
 	server := c.shardPolicy(servers, record)
 	opts := []grpc.DialOption{grpc.WithInsecure()}
@@ -96,7 +107,7 @@ func (c *Client) Append(record string) (int32, error) {
 	// TODO: don't dial for every operation. Save the connection and reuse it
 	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.config.DiscoveryAddress.IP, server.Port), opts...)
 	if err != nil {
-		return -1, err
+		return -1, -1, err
 	}
 	defer conn.Close()
 	dataClient := data.NewDataClient(conn)
@@ -110,17 +121,9 @@ func (c *Client) Append(record string) (int32, error) {
 	c.appendMu.Unlock()
 	resp, err := dataClient.Append(context.Background(), req)
 	if err != nil {
-		return -1, err
+		return -1, -1, err
 	}
-	return resp.Gsn, nil
-}
-
-// AppendToShard appends a record to a shard based on the shard policy, and
-// returns the global sequence number assigned by Scalog and the shard's
-// identifier.
-func (c *Client) AppendToShard(record string) (int32, int32, error) {
-	// TODO: requires that discovery service returns the shard ID in DataServerAddress
-	return -1, -1, nil
+	return resp.Gsn, server.ShardID, nil
 }
 
 // Subscribe subscribes to CommitedRecords starting from a global sequence
@@ -149,8 +152,20 @@ func (c *Client) Subscribe(gsn int32) (chan CommittedRecord, error) {
 
 // ReadRecord reads a record with a global sequence number from a shard.
 func (c *Client) ReadRecord(gsn int32, shardID int32) (string, error) {
-	// TODO: requires that discovery service returns a server's the shard id
-	return "", nil
+	servers, err := c.discoverServers()
+	if err != nil {
+		return "", err
+	}
+	for _, server := range servers {
+		if server.ShardID == shardID {
+			record, err := c.readFromServer(server, gsn)
+			if err != nil {
+				return "", err
+			}
+			return record, nil
+		}
+	}
+	return "", fmt.Errorf("Attempted to read record from non-existant shard %d", shardID)
 }
 
 // Trim deletes records before a global sequence number from the data servers.
@@ -270,6 +285,23 @@ func (c *Client) trimFromServer(server *discovery.DataServer, gsn int32) error {
 	req := &data.TrimRequest{Gsn: gsn}
 	_, err = dataClient.Trim(context.Background(), req)
 	return err
+}
+
+// readFromServer reads a record with a global sequence number from a server.
+func (c *Client) readFromServer(server *discovery.DataServer, gsn int32) (string, error) {
+	opts := []grpc.DialOption{grpc.WithInsecure()}
+	conn, err := grpc.Dial(c.config.DiscoveryAddress.stats(), opts...)
+	if err != nil {
+		return "", err
+	}
+	defer conn.Close()
+	dataClient := data.NewDataClient(conn)
+	req := &data.ReadRequest{Gsn: gsn}
+	resp, err := dataClient.Read(context.Background(), req)
+	if err != nil {
+		return "", err
+	}
+	return resp.Record, nil
 }
 
 // discoverServers queries the discovery service and returns the live data
