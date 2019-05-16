@@ -84,11 +84,12 @@
 
 [[projects]]
   branch = "master"
-  digest = "1:bb91612a26e5a5229dd37b1d5dc5ec1cd3ca54d7e8bce78ce1ebcfadfab526cd"
+  digest = "1:fafa3635a0f4fa6f10fe3f01f73f660446c29ce3b85bea353067e36d3c274a5c"
   name = "github.com/scalog/scalog"
   packages = [
     "data/messaging",
     "discovery/rpc",
+    "pkg/set64",
   ]
   pruneopts = "UT"
   revision = "5eed18b5dfb187242d331d54a28a90318a8c7586"
@@ -256,6 +257,7 @@
     "github.com/mitchellh/go-homedir",
     "github.com/scalog/scalog/data/messaging",
     "github.com/scalog/scalog/discovery/rpc",
+    "github.com/scalog/scalog/pkg/set64",
     "github.com/spf13/cobra",
     "github.com/spf13/viper",
     "google.golang.org/grpc",
