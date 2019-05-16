@@ -13,11 +13,15 @@ type Bench struct {
 	data   string
 }
 
-func NewBench(num, size int32) *Bench {
+func NewBench(num, size int32) (*Bench, error) {
 	b := &Bench{num: num, size: size}
-	b.client = clientlib.NewClient()
+	client, err := clientlib.NewClient()
+	if err != nil {
+		return nil, err
+	}
+	b.client = client
 	b.data = string(make([]byte, b.size))
-	return b
+	return b, nil
 }
 
 func (b *Bench) Start() error {

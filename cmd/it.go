@@ -26,7 +26,14 @@ var itCmd = &cobra.Command{
 	Short: "Scalog interactive client",
 	Long:  `Scalog interactive client`,
 	Run: func(cmd *cobra.Command, args []string) {
-		it.NewIt().Start()
+		i, err := it.NewIt()
+		if err != nil {
+			panic(err)
+		}
+		err = i.Start()
+		if err != nil {
+			panic(err)
+		}
 	},
 }
 

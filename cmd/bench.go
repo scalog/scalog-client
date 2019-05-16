@@ -26,15 +26,19 @@ var benchCmd = &cobra.Command{
 	Short: "Scalog client-side benchmarks",
 	Long:  `Scalog client-side benchmarks`,
 	Run: func(cmd *cobra.Command, args []string) {
-		num, err := cmd.Flags().GetInt32("num")
+		num, err := cmd.Flags().GetInt("num")
 		if err != nil {
 			panic(err)
 		}
-		size, err := cmd.Flags().GetInt32("size")
+		size, err := cmd.Flags().GetInt("size")
 		if err != nil {
 			panic(err)
 		}
-		err = bench.NewBench(num, size).Start()
+		b, err := bench.NewBench(int32(num), int32(size))
+		if err != nil {
+			panic(err)
+		}
+		err = b.Start()
 		if err != nil {
 			panic(err)
 		}

@@ -1,4 +1,5 @@
-// Package client provides clients with the ability to interact with the Scalog API.
+// Package lib provides applications with the ability to create an instance of
+// Scalog client, which interacts with the Scalog API.
 package lib
 
 import (
@@ -14,294 +15,287 @@ import (
 
 	data "github.com/scalog/scalog/data/messaging"
 	discovery "github.com/scalog/scalog/discovery/rpc"
-	set64 "github.com/scalog/scalog/pkg/set64"
 	"google.golang.org/grpc"
 )
 
-/*
-discoveryAddress is a struct that contains the configuration data specified in [config.yaml]
-for the discovery address.
-*/
-type discoveryAddress struct {
-	Ip   string `yaml:"ip"`
-	Port int32  `yaml:"port"`
-}
-
-/*
-config is a struct that contains the configuration data specified in [config.yaml].
-*/
-type config struct {
-	DiscoveryAddress discoveryAddress `yaml:"discovery-address"`
-}
-
-/*
-SubscribeResponse is a struct that represents a record [Record] that has been ordered
-by Scalog and assigned the global sequence number [gsn].
-*/
-type SubscribeResponse struct {
-	Gsn    int32
+// CommittedRecord represents a record that has been commited by Scalog.
+type CommittedRecord struct {
+	// Global sequence number assigned by Scalog
+	Gsn int32
+	// Data of record
 	Record string
 }
 
-/*
-Client is a struct that carries the meta-data necessary for a client to interact
-with the Scalog API. Clients should initialize a new instance of this struct with
-the newClient() function.
-*/
+// ShardPolicy determines which records are appended to which shards.
+type ShardPolicy func(servers []*discovery.DataServerAddress, record string) (server *discovery.DataServerAddress)
+
+// Client interacts with the Scalog API.
 type Client struct {
-	// Integer serving as unique client id
-	cid int32
-	// Client-generated record sequence number
-	csn int32
-	// Mutex for interacting with [csn]
-	cmu sync.RWMutex
-	// Next global sequence number to respond to client
+	// Unique client identifier
+	clientID int32
+	// Client sequence number to be assigned to the next record
+	nextCsn int32
+	// Mutex for accessing nextCsn
+	appendMu sync.RWMutex
+	// Global sequence number of next CommitedRecord to respond to if subscribed
 	nextGsn int32
-	// Set of global sequence numbers received from data servers
-	ss *set64.Set64
-	// Map from global sequence number to [SubscribeResponse]
-	sm map[int32]SubscribeResponse
-	// Mutex for interacting with [nextGsn], [ss], and [sm]
-	smu sync.RWMutex
-	// Channel to send subscribe responses to the client
-	sc chan SubscribeResponse
-	// Configuration as defined in config.yaml for client library
-	conf *config
+	// Map from global sequence number to CommittedRecord
+	committedRecords map[int32]CommittedRecord
+	// Mutex for accessing nextGsn and commitedRecords
+	subscribeMu sync.RWMutex
+	// Channel to send CommitedRecords if subscribed
+	subscribeChan chan CommittedRecord
+	// Function that determines which records are appended to which shards
+	shardPolicy ShardPolicy
+	// Configuration meta-data specified in config.yaml
+	config *config
 }
 
-/*
-NewClient initializes and returns a new instance of [Client] with a unique client id.
-*/
-func NewClient() *Client {
-	return &Client{
-		cid:     assignClientID(),
-		csn:     0,
-		cmu:     sync.RWMutex{},
-		nextGsn: -1,
-		ss:      set64.NewSet64(),
-		sm:      make(map[int32]SubscribeResponse),
-		smu:     sync.RWMutex{},
-		sc:      make(chan SubscribeResponse),
-		conf:    parseConfig(),
-	}
+// address represents an IP address and port number.
+type address struct {
+	IP   string `yaml:"ip"`
+	Port int32  `yaml:"port"`
 }
 
-/*
-Append appends a record [r], and returns the global sequence number assigned to it.
-Note: this is a blocking function!
-*/
-func (c *Client) Append(r string) (int32, error) {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
-	addresses := discoverServers(c.conf.DiscoveryAddress)
-	address := applyAppendPlacementPolicy(addresses)
-	// conn, err := grpc.Dial(addressToString(address), opts...)
-	// TODO: temporary hot fix due to bug in discovery service
-	// TODO: don't dial for every operation. Save the connection and reuse it
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.conf.DiscoveryAddress.Ip, address.Port), opts...)
+// config contains the meta-data specified in config.yaml.
+type config struct {
+	DiscoveryAddress address `yaml:"discovery-address"`
+}
+
+// NewClient returns a new instance of Client.
+func NewClient() (*Client, error) {
+	config, err := parseConfig()
 	if err != nil {
-		panic(err)
+		return nil, err
+	}
+	c := &Client{
+		clientID:         assignClientID(),
+		nextCsn:          0,
+		appendMu:         sync.RWMutex{},
+		nextGsn:          -1,
+		committedRecords: make(map[int32]CommittedRecord),
+		subscribeMu:      sync.RWMutex{},
+		subscribeChan:    make(chan CommittedRecord),
+		shardPolicy:      defaultShardPolicy,
+		config:           config,
+	}
+	return c, nil
+}
+
+// Append appends a record to a shard based on the shard policy, and returns the
+// global sequence number assigned by Scalog.
+func (c *Client) Append(record string) (int32, error) {
+	servers, err := c.discoverServers()
+	if err != nil {
+		return -1, err
+	}
+	server := c.shardPolicy(servers, record)
+	opts := []grpc.DialOption{grpc.WithInsecure()}
+	// conn, err := grpc.Dial(getAddressOfServer(server), opts...)
+	// TODO: temporary fix due to discovery service returning server's cluster IP
+	// TODO: don't dial for every operation. Save the connection and reuse it
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.config.DiscoveryAddress.IP, server.Port), opts...)
+	if err != nil {
+		return -1, err
 	}
 	defer conn.Close()
-
 	dataClient := data.NewDataClient(conn)
-	c.cmu.Lock()
-	appendRequest := &data.AppendRequest{
-		Cid:    c.cid,
-		Csn:    c.csn,
-		Record: r,
+	c.appendMu.Lock()
+	req := &data.AppendRequest{
+		Cid:    c.clientID,
+		Csn:    c.nextCsn,
+		Record: record,
 	}
-	c.csn = c.csn + 1
-	c.cmu.Unlock()
-
-	resp, err := dataClient.Append(context.Background(), appendRequest)
+	c.nextCsn++
+	c.appendMu.Unlock()
+	resp, err := dataClient.Append(context.Background(), req)
 	if err != nil {
 		return -1, err
 	}
 	return resp.Gsn, nil
 }
 
-/*
-Subscribe subscribes to records starting from global sequence number [gsn].
-*/
-func (c *Client) Subscribe(gsn int32) chan SubscribeResponse {
-	c.cmu.Lock()
+// AppendToShard appends a record to a shard based on the shard policy, and
+// returns the global sequence number assigned by Scalog and the shard's
+// identifier.
+func (c *Client) AppendToShard(record string) (int32, int32, error) {
+	// TODO: requires that discovery service returns the shard ID in DataServerAddress
+	return -1, -1, nil
+}
+
+// Subscribe subscribes to CommitedRecords starting from a global sequence
+// number, and returns a channel on which to read from.
+func (c *Client) Subscribe(gsn int32) (chan CommittedRecord, error) {
+	servers, err := c.discoverServers()
+	if err != nil {
+		return nil, err
+	}
+	c.subscribeMu.Lock()
 	c.nextGsn = gsn
-	c.cmu.Unlock()
-	addresses := discoverServers(c.conf.DiscoveryAddress)
-	for _, address := range addresses {
-		// go c.subscribe(address, gsn)
-		// TODO: temporary hot fix due to bug in discovery service
-		go c.subscribe(&discovery.DataServerAddress{
-			Ip:   c.conf.DiscoveryAddress.Ip,
-			Port: address.Port,
-		}, gsn)
+	c.subscribeMu.Unlock()
+	for _, server := range servers {
+		// go c.subscribeToServer(server, gsn)
+		// TODO: temporary fix due to discovery service returning server's cluster IP
+		go c.subscribeToServer(
+			&discovery.DataServerAddress{
+				Ip:   c.config.DiscoveryAddress.IP,
+				Port: server.Port,
+			},
+			gsn,
+		)
 	}
-	return c.sc
+	return c.subscribeChan, nil
 }
 
-/*
-Trim deletes records before global sequence number [gsn].
-*/
-func (c *Client) Trim(gsn int32) {
-	addresses := discoverServers(c.conf.DiscoveryAddress)
-	for _, address := range addresses {
-		// go c.trim(address, gsn)
-		// TODO: temporary hot fix due to bug in discovery service
-		go c.trim(&discovery.DataServerAddress{
-			Ip:   c.conf.DiscoveryAddress.Ip,
-			Port: address.Port,
-		}, gsn)
-	}
+// ReadRecord reads a record with a global sequence number from a shard.
+func (c *Client) ReadRecord(gsn int32, shardID int32) (string, error) {
+	// TODO: requires that discovery service returns a server's the shard id
+	return "", nil
 }
 
-/*
-Returns a randomly generated 31-bit integer as int32.
-Note: uniqueness is not guaranteed!
-*/
+// Trim deletes records before a global sequence number from the data servers.
+func (c *Client) Trim(gsn int32) error {
+	servers, err := c.discoverServers()
+	if err != nil {
+		return err
+	}
+	for _, server := range servers {
+		// go c.trim(server, gsn)
+		// TODO: temporary fix due to discovery service returning server's cluster IP
+		go c.trimFromServer(
+			&discovery.DataServerAddress{
+				Ip:   c.config.DiscoveryAddress.IP,
+				Port: server.Port,
+			},
+			gsn,
+		)
+	}
+	return nil
+}
+
+// SetShardPolicy sets the policy for determining which records are appended to
+// which shards.
+func (c *Client) SetShardPolicy(shardPolicy ShardPolicy) {
+	c.shardPolicy = shardPolicy
+}
+
+// assignClientID returns a randomly generated 31-bit integer as int32.
 func assignClientID() int32 {
-	s := rand.NewSource(time.Now().UnixNano())
-	return rand.New(s).Int31()
+	seed := rand.NewSource(time.Now().UnixNano())
+	return rand.New(seed).Int31()
 }
 
-/*
-Parse config file and initialize an instance of [config].
-*/
-func parseConfig() *config {
-	var conf config
-	file, err := ioutil.ReadFile("../config.yaml")
-	if err != nil {
-		panic(err)
-	}
-	err = yaml.Unmarshal([]byte(file), &conf)
-	if err != nil {
-		panic(err)
-	}
-	return &conf
+// defaultShardPolicy returns a random server.
+func defaultShardPolicy(servers []*discovery.DataServerAddress, record string) *discovery.DataServerAddress {
+	seed := rand.NewSource(time.Now().UnixNano())
+	return servers[rand.New(seed).Intn(len(servers))]
 }
 
-/*
-Queries the discovery service and returns a slice of the addresses of all active
-data servers.
-*/
-func discoverServers(discoveryAddress discoveryAddress) []*discovery.DataServerAddress {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
-	address := fmt.Sprintf("%s:%d", discoveryAddress.Ip, discoveryAddress.Port)
-	conn, err := grpc.Dial(address, opts...)
+// parseConfig initializes and returns an instance of config with the meta-data
+// specified in config.yaml.
+func parseConfig() (*config, error) {
+	file, err := ioutil.ReadFile("./config.yaml")
 	if err != nil {
-		panic(err)
+		return nil, err
+	}
+	var config config
+	err = yaml.Unmarshal(file, &config)
+	if err != nil {
+		return nil, err
+	}
+	return &config, nil
+}
+
+// subscribeToServer subscribes to a data server and sends CommittedRecords in
+// order to the subscribeChan
+func (c *Client) subscribeToServer(server *discovery.DataServerAddress, gsn int32) error {
+	opts := []grpc.DialOption{grpc.WithInsecure()}
+	// conn, err := grpc.Dial(getAddressOfServer(server), opts...)
+	// TODO: temporary fix due to discovery service returning server's cluster IP
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.config.DiscoveryAddress.IP, server.Port), opts...)
+	if err != nil {
+		return err
 	}
 	defer conn.Close()
-
-	discoveryClient := discovery.NewDiscoveryClient(conn)
-	discoveryRequest := &discovery.DiscoverRequest{}
-
-	resp, err := discoveryClient.DiscoverServers(context.Background(), discoveryRequest)
-	if err != nil {
-		panic(err)
-	}
-	return resp.Servers
-}
-
-/*
-Given a slice of addresses of all active data servers, selects and returns a single
-address based on the pre-defined data placement policy.
-*/
-func applyAppendPlacementPolicy(addresses []*discovery.DataServerAddress) *discovery.DataServerAddress {
-	if len(addresses) == 0 {
-		panic("Failed to append: no active data servers discovered!")
-	}
-	s := rand.NewSource(time.Now().UnixNano())
-	return addresses[rand.New(s).Intn(len(addresses))] // TODO: select address based on data placement policy
-}
-
-/*
-Creates a stream to the data server on address [address], listens for the
-data server to report ordered records with gsn > [gsn], and if possible,
-responds to the client in order.
-*/
-func (c *Client) subscribe(address *discovery.DataServerAddress, gsn int32) {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
-	conn, err := grpc.Dial(addressToString(address), opts...)
-	if err != nil {
-		panic(err)
-	}
-	defer conn.Close()
-
 	dataClient := data.NewDataClient(conn)
-	subscribeRequest := &data.SubscribeRequest{
-		SubscriptionGsn: gsn,
-	}
-
-	stream, err := dataClient.Subscribe(context.Background(), subscribeRequest)
+	req := &data.SubscribeRequest{SubscriptionGsn: gsn}
+	stream, err := dataClient.Subscribe(context.Background(), req)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	for {
 		in, err := stream.Recv()
 		if err == io.EOF {
-			return
+			return nil
 		}
 		if err != nil {
-			panic(err)
+			return err
 		}
-
-		if in.Gsn < c.nextGsn {
-			return
-		}
-		c.smu.Lock()
-		c.ss.Add(int64(in.Gsn)) // TODO: remove type casting once gsn are int64
-		c.sm[in.Gsn] = SubscribeResponse{
+		c.subscribeMu.Lock()
+		c.committedRecords[in.Gsn] = CommittedRecord{
 			Gsn:    in.Gsn,
 			Record: in.Record,
 		}
 		if in.Gsn == c.nextGsn {
 			c.respond()
 		}
-		c.smu.Unlock()
+		c.subscribeMu.Unlock()
 	}
 }
 
-/*
-Responds to client with [SubscribeResponse] in order of global sequence number
-if possible.
-*/
+// respond sends CommitedRecords to the subscribeChan in order of global sequence
+// number starting from nextGsn.
 func (c *Client) respond() {
-	for c.ss.Contains(int64(c.nextGsn)) { // TODO: remove type casting once gsn are int64
-		c.sc <- c.sm[c.nextGsn]
-		c.ss.Remove(int64(c.nextGsn)) // TODO: remove type casting once gsn are int64
-		delete(c.sm, c.nextGsn)
-		c.nextGsn = c.nextGsn + 1
+	for commitedRecord, in := c.committedRecords[c.nextGsn]; ; c.nextGsn++ {
+		if !in {
+			break
+		}
+		c.subscribeChan <- commitedRecord
+		delete(c.committedRecords, c.nextGsn)
 	}
 }
 
-/*
-Creates a stream to the data server on address [address] and requests that all
-records with gsn < [gsn] be deleted.
-*/
-func (c *Client) trim(address *discovery.DataServerAddress, gsn int32) {
-	var opts []grpc.DialOption
-	opts = append(opts, grpc.WithInsecure())
-	conn, err := grpc.Dial(addressToString(address), opts...)
+// trimFromServer deletes records before a global sequence number from a data
+// server.
+func (c *Client) trimFromServer(server *discovery.DataServerAddress, gsn int32) error {
+	opts := []grpc.DialOption{grpc.WithInsecure()}
+	// conn, err := grpc.Dial(getAddressOfServer(server), opts...)
+	// TODO: temporary fix due to discovery service returning server's cluster IP
+	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", c.config.DiscoveryAddress.IP, server.Port), opts...)
 	if err != nil {
-		panic(err)
+		return err
 	}
 	defer conn.Close()
-
 	dataClient := data.NewDataClient(conn)
-	r := &data.TrimRequest{
-		Gsn: gsn,
-	}
-
-	dataClient.Trim(context.Background(), r)
-	// No response expected
+	req := &data.TrimRequest{Gsn: gsn}
+	_, err = dataClient.Trim(context.Background(), req)
+	return err
 }
 
-/*
-Returns DataServerAddress [address] as a string.
-*/
-func addressToString(address *discovery.DataServerAddress) string {
-	return fmt.Sprintf("%s:%d", address.Ip, address.Port)
+// discoverServers queries the discovery service and returns the live data
+// servers.
+func (c *Client) discoverServers() ([]*discovery.DataServerAddress, error) {
+	opts := []grpc.DialOption{grpc.WithInsecure()}
+	conn, err := grpc.Dial(c.config.DiscoveryAddress.stats(), opts...)
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	discoveryClient := discovery.NewDiscoveryClient(conn)
+	req := &discovery.DiscoverRequest{}
+	resp, err := discoveryClient.DiscoverServers(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
+	return resp.Servers, nil
+}
+
+// getAddressOfServer returns the address of a server as a string.
+func getAddressOfServer(server *discovery.DataServerAddress) string {
+	return fmt.Sprintf("%s:%d", server.Ip, server.Port)
+}
+
+// stats returns an address as a string
+func (a address) stats() string {
+	return fmt.Sprintf("%s:%d", a.IP, a.Port)
 }

@@ -15,10 +15,14 @@ type It struct {
 	client *clientlib.Client
 }
 
-func NewIt() *It {
+func NewIt() (*It, error) {
 	it := &It{}
-	it.client = clientlib.NewClient()
-	return it
+	client, err := clientlib.NewClient()
+	if err != nil {
+		return nil, err
+	}
+	it.client = client
+	return it, nil
 }
 
 func (it *It) Start() error {

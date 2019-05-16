@@ -8,7 +8,10 @@ import (
 )
 
 func TestSingleAppend(t *testing.T) {
-	client := NewClient()
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
 	gsn, err := client.Append("Hello, World!")
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -19,7 +22,10 @@ func TestSingleAppend(t *testing.T) {
 }
 
 func TestMultipleAppend(t *testing.T) {
-	client := NewClient()
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
 	set := set64.NewSet64()
 	for i := 1; i <= 5; i++ {
 		gsn, err := client.Append(fmt.Sprintf("Appending %d", i))
@@ -39,7 +45,10 @@ func TestMultipleAppend(t *testing.T) {
 func TestMultipleClientsAppend(t *testing.T) {
 	set := set64.NewSet64()
 	for i := 1; i <= 5; i++ {
-		client := NewClient()
+		client, err := NewClient()
+		if err != nil {
+			t.Fatalf(err.Error())
+		}
 		gsn, err := client.Append(fmt.Sprintf("Appending %d", i))
 		if err != nil {
 			t.Fatalf(err.Error())
@@ -55,9 +64,15 @@ func TestMultipleClientsAppend(t *testing.T) {
 }
 
 func TestSimpleSubscribe(t *testing.T) {
-	client := NewClient()
-	c := client.Subscribe(1)
-	_, err := client.Append("Hello, World!")
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	c, err := client.Subscribe(1)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	_, err = client.Append("Hello, World!")
 	if err != nil {
 		t.Errorf(err.Error())
 	}
@@ -68,8 +83,14 @@ func TestSimpleSubscribe(t *testing.T) {
 }
 
 func TestMultipleSubscribe(t *testing.T) {
-	client := NewClient()
-	c := client.Subscribe(1)
+	client, err := NewClient()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	c, err := client.Subscribe(1)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
 	set := set64.NewSet64()
 	for i := 1; i <= 5; i++ {
 		_, err := client.Append(fmt.Sprintf("Appending %d", i))

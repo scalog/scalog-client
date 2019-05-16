@@ -26,7 +26,14 @@ var testCmd = &cobra.Command{
 	Short: "Integrated test",
 	Long:  `Integrated test`,
 	Run: func(cmd *cobra.Command, args []string) {
-		test.NewTest().Start()
+		t, err := test.NewTest()
+		if err != nil {
+			panic(err)
+		}
+		err = t.Start()
+		if err != nil {
+			panic(err)
+		}
 	},
 }
 

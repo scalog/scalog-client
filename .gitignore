@@ -13,3 +13,6 @@
 
 # Config file
 config.yaml
+
+# Executable
+scalog-client
