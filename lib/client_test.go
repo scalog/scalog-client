@@ -1,13 +1,17 @@
 package lib
 
 import (
-	"fmt"
 	"testing"
-
-	"github.com/scalog/scalog/pkg/set64"
 )
 
-func TestSingleAppend(t *testing.T) {
+func TestNewClient(t *testing.T) {
+	_, err := NewClient()
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+}
+
+func TestAppend(t *testing.T) {
 	client, err := NewClient()
 	if err != nil {
 		t.Fatalf(err.Error())
@@ -16,94 +20,68 @@ func TestSingleAppend(t *testing.T) {
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	if gsn < 1 {
+	if gsn < 0 {
 		t.Fatalf("Record assigned invalid global sequence number %d", gsn)
 	}
 }
 
-func TestMultipleAppend(t *testing.T) {
+func TestSubscribe(t *testing.T) {
 	client, err := NewClient()
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	set := set64.NewSet64()
-	for i := 1; i <= 5; i++ {
-		gsn, err := client.Append(fmt.Sprintf("Appending %d", i))
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-		if gsn < 1 {
-			t.Fatalf("Record assigned invalid global sequence number %d", gsn)
-		}
-		if set.Contains(int64(gsn)) {
-			t.Fatalf("Record assigned previously assigned global sequence number %d", gsn)
-		}
-		set.Add(int64(gsn))
+	gsn, err := client.Append("Hello, World!")
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	subscribeChan, err := client.Subscribe(gsn)
+	if err != nil {
+		t.Errorf(err.Error())
+	}
+	resp := <-subscribeChan
+	if resp.Gsn != gsn {
+		t.Fatalf("Expected: %d, Actual: %d", gsn, resp.Gsn)
 	}
 }
 
-func TestMultipleClientsAppend(t *testing.T) {
-	set := set64.NewSet64()
-	for i := 1; i <= 5; i++ {
-		client, err := NewClient()
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-		gsn, err := client.Append(fmt.Sprintf("Appending %d", i))
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-		if gsn < 1 {
-			t.Fatalf("Record assigned invalid global sequence number %d", gsn)
-		}
-		if set.Contains(int64(gsn)) {
-			t.Fatalf("Record assigned previously assigned global sequence number %d", gsn)
-		}
-		set.Add(int64(gsn))
-	}
-}
-
-func TestSimpleSubscribe(t *testing.T) {
+func TestReadRecord(t *testing.T) {
 	client, err := NewClient()
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	c, err := client.Subscribe(1)
+	expected := "Hello, World!"
+	gsn, shardID, err := client.AppendToShard(expected)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatalf(err.Error())
 	}
-	_, err = client.Append("Hello, World!")
+	actual, err := client.ReadRecord(gsn, shardID)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatalf(err.Error())
 	}
-	resp := <-c
-	if resp.Gsn < 1 {
-		t.Fatalf("Record assigned invalid global sequence number %d", resp.Gsn)
+	if expected != actual {
+		t.Fatalf("Expected: %s, Actual: %s", expected, actual)
 	}
 }
 
-func TestMultipleSubscribe(t *testing.T) {
+func TestTrim(t *testing.T) {
 	client, err := NewClient()
 	if err != nil {
 		t.Fatalf(err.Error())
 	}
-	c, err := client.Subscribe(1)
+	expected := "Hello, World!"
+	gsn, shardID, err := client.AppendToShard(expected)
 	if err != nil {
-		t.Errorf(err.Error())
+		t.Fatalf(err.Error())
 	}
-	set := set64.NewSet64()
-	for i := 1; i <= 5; i++ {
-		_, err := client.Append(fmt.Sprintf("Appending %d", i))
-		if err != nil {
-			t.Fatalf(err.Error())
-		}
-		resp := <-c
-		if resp.Gsn < 1 {
-			t.Fatalf("Record assigned invalid global sequence number %d", resp.Gsn)
-		}
-		if set.Contains(int64(resp.Gsn)) {
-			t.Fatalf("Duplicate subscribe responses received for global sequence number %d", resp.Gsn)
-		}
-		set.Add(int64(resp.Gsn))
+	actual, err := client.ReadRecord(gsn, shardID)
+	if err != nil {
+		t.Fatalf(err.Error())
+	}
+	if expected != actual {
+		t.Fatalf("Expected: %s, Actual: %s", expected, actual)
+	}
+	err = client.Trim(gsn + 1)
+	if err != nil {
+		t.Fatalf(err.Error())
 	}
 }
