@@ -26,15 +26,15 @@ var benchCmd = &cobra.Command{
 	Short: "Scalog client-side benchmarks",
 	Long:  `Scalog client-side benchmarks`,
 	Run: func(cmd *cobra.Command, args []string) {
-		num, err := cmd.Flags().GetInt("num")
+		num, err := cmd.Flags().GetInt32("num")
 		if err != nil {
 			panic(err)
 		}
-		size, err := cmd.Flags().GetInt("size")
+		size, err := cmd.Flags().GetInt32("size")
 		if err != nil {
 			panic(err)
 		}
-		b, err := bench.NewBench(int32(num), int32(size))
+		b, err := bench.NewBench(num, size)
 		if err != nil {
 			panic(err)
 		}
@@ -56,6 +56,6 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	benchCmd.Flags().IntP("num", "n", 1000, "Number of append operations")
-	benchCmd.Flags().IntP("size", "s", 4096, "Size of each append operation")
+	benchCmd.Flags().Int32P("num", "n", 1000, "Number of append operations")
+	benchCmd.Flags().Int32P("size", "s", 4096, "Size of each append operation")
 }
