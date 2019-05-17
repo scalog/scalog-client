@@ -249,12 +249,14 @@ func (c *Client) subscribeToServer(server *discovery.DataServer, gsn int32) erro
 // respond sends CommitedRecords to the subscribeChan in order of global sequence
 // number starting from nextGsn.
 func (c *Client) respond() {
-	for commitedRecord, in := c.committedRecords[c.nextGsn]; ; c.nextGsn++ {
+	for {
+		commitedRecord, in := c.committedRecords[c.nextGsn]
 		if !in {
 			break
 		}
 		c.subscribeChan <- commitedRecord
-		delete(c.committedRecords, c.nextGsn)
+		delete(c.committedRecords, commitedRecord.Gsn)
+		c.nextGsn++
 	}
 }
 

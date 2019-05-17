@@ -71,8 +71,9 @@ func (it *It) Start() error {
 				continue
 			}
 			go func() {
-				committedRecord := <-subscribeChan
-				fmt.Fprintf(os.Stderr, "Subscribe result: { Gsn: %d, Record: %s }\n", committedRecord.Gsn, committedRecord.Record)
+				for committedRecord := range subscribeChan {
+					fmt.Fprintf(os.Stderr, "Subscribe result: { Gsn: %d, Record: %s }\n", committedRecord.Gsn, committedRecord.Record)
+				}
 			}()
 		} else if cmd[0] == "trim" {
 			if len(cmd) < 2 {
