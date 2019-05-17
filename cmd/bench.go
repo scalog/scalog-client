@@ -56,6 +56,6 @@ func init() {
 
 	// Cobra supports local flags which will only run when this command
 	// is called directly, e.g.:
-	benchCmd.Flags().Int32P("num", "n", 1000, "Number of append operations")
-	benchCmd.Flags().Int32P("size", "s", 4096, "Size of each append operation")
+	benchCmd.Flags().Int32P("num", "n", 128, "Number of append operations")
+	benchCmd.Flags().Int32P("size", "s", 2048, "Size of each append operation")
 }

@@ -21,8 +21,7 @@ func NewTest() (*Test, error) {
 }
 
 func (t *Test) Start() error {
-	// TODO: implement the test
-	num := 256
+	num := 32
 	minGsn := int32(-1)
 	maxGsn := int32(-1)
 	gsnToRecord := make(map[int32]string, num)
