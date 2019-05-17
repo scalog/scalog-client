@@ -65,6 +65,10 @@ func (it *It) Start() error {
 				fmt.Fprintln(os.Stderr, err)
 				continue
 			}
+			if gsn < 1 {
+				fmt.Fprintln(os.Stderr, "Command error: [gsn] must be greater than 0")
+				continue
+			}
 			subscribeChan, err := it.client.Subscribe(int32(gsn))
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
@@ -83,6 +87,10 @@ func (it *It) Start() error {
 			gsn, err := strconv.ParseInt(cmd[1], 10, 32)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, err)
+				continue
+			}
+			if gsn < 1 {
+				fmt.Fprintln(os.Stderr, "Command error: [gsn] must be greater than 0")
 				continue
 			}
 			err = it.client.Trim(int32(gsn))
