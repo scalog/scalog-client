@@ -143,7 +143,9 @@ func (it *It) Start() error {
 		} else if cmd[0] == "help" {
 			fmt.Fprintln(os.Stderr, "Supported commands:")
 			fmt.Fprintln(os.Stderr, "    append [record]")
+			fmt.Fprintln(os.Stderr, "    appendToShard [record]")
 			fmt.Fprintln(os.Stderr, "    subscribe [gsn]")
+			fmt.Fprintln(os.Stderr, "    readRecord [gsn] [shardID]")
 			fmt.Fprintln(os.Stderr, "    trim [gsn]")
 			fmt.Fprintln(os.Stderr, "    exit")
 		} else {
