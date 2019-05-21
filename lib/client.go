@@ -120,12 +120,10 @@ func (c *Client) AppendToShard(record string) (int32, int32, error) {
 	}
 	c.nextCsn++
 	c.appendMu.Unlock()
-	fmt.Println("BLOCKED\n")
 	resp, err := dataClient.Append(context.Background(), req)
 	if err != nil {
 		return -1, -1, err
 	}
-	fmt.Println("UNBLOCKED\n")
 	return resp.Gsn, shard.ShardID, nil
 }
 
