@@ -57,10 +57,12 @@ Run the below command in the root directory to perform end-to-end testing.
 ```go
 import "github.com/scalog/scalog-client/client"
 
-client := client.NewClient()
-resp, err := client.Append("Hello, World!")
-if err != nil {
-    fmt.Println(err.Error())
+func main() {
+  client := client.NewClient()
+  resp, err := client.Append("Hello, World!")
+  if err != nil {
+      fmt.Println(err.Error())
+  }
+  fmt.Println(fmt.Sprintf("Global sequence number %d assigned to record", resp))
 }
-fmt.Println(fmt.Sprintf("Global sequence number %d assigned to record", resp))
 ```
