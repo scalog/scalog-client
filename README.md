@@ -20,15 +20,36 @@ discovery-address:
   port: 8000        // Set the port
 ```
 
-Run the below command in the root directory to update dependencies.
-
-`dep ensure`
-
-Run the below commands to build the project.
+Run the below command in the root directory to download the dependencies and build the project.
 
 ```
-cd client
+dep ensure
 go build
+```
+
+## Command Line Interface
+
+Start the command line interface by running the below command in the root directory. Once started, run the `help` command to see the available commands.
+
+```
+./scalog-client it
+help
+```
+
+## Benchmarking
+
+Run the below command in the root directory to perform benchmark tests for a single client. Optionally, specify additional flags `--num` and `--size` for the number of append operations and the size of each append operation, respectively.
+
+```
+./scalog-client bench
+```
+
+## Testing
+
+Run the below command in the root directory to perform end-to-end testing.
+
+```
+./scalog-client test
 ```
 
 ## Example Usage
