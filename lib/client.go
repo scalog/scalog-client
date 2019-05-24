@@ -47,6 +47,12 @@ type Client struct {
 	subscribeChan chan CommittedRecord
 	// Function that determines which records are appended to which shards
 	shardPolicy ShardPolicy
+	// Version of the client's view
+	viewID int32
+	// Slice of live data servers grouped by shard.
+	view []*discovery.Shard
+	// Mutex for accessing viewID and view
+	viewMu sync.RWMutex
 	// Configuration meta-data specified in config.yaml
 	config *config
 }
@@ -77,7 +83,13 @@ func NewClient() (*Client, error) {
 		subscribeMu:      sync.RWMutex{},
 		subscribeChan:    make(chan CommittedRecord),
 		shardPolicy:      defaultShardPolicy,
+		viewID:           0,
+		viewMu:           sync.RWMutex{},
 		config:           config,
+	}
+	err = c.updateView()
+	if err != nil {
+		return nil, err
 	}
 	return c, nil
 }
@@ -96,11 +108,7 @@ func (c *Client) Append(record string) (int32, error) {
 // returns the global sequence number assigned by Scalog and the shard's
 // identifier.
 func (c *Client) AppendToShard(record string) (int32, int32, error) {
-	shards, err := c.discoverShards()
-	if err != nil {
-		return -1, -1, err
-	}
-	shard := c.shardPolicy(shards, record)
+	shard := c.shardPolicy(c.view, record)
 	server := getRandomServerInShard(shard)
 	opts := []grpc.DialOption{grpc.WithInsecure()}
 	// TODO: temporary fix due to discovery service returning server's cluster IP
@@ -124,20 +132,25 @@ func (c *Client) AppendToShard(record string) (int32, int32, error) {
 	if err != nil {
 		return -1, -1, err
 	}
+	c.viewMu.Lock()
+	if resp.ViewID != c.viewID {
+		err := c.updateView()
+		if err != nil {
+			return -1, -1, err
+		}
+		c.viewID = resp.ViewID
+	}
+	c.viewMu.Lock()
 	return resp.Gsn, shard.ShardID, nil
 }
 
 // Subscribe subscribes to CommitedRecords starting from a global sequence
 // number, and returns a channel on which to read from.
 func (c *Client) Subscribe(gsn int32) (chan CommittedRecord, error) {
-	shards, err := c.discoverShards()
-	if err != nil {
-		return nil, err
-	}
 	c.subscribeMu.Lock()
 	c.nextGsn = gsn
 	c.subscribeMu.Unlock()
-	for _, shard := range shards {
+	for _, shard := range c.view {
 		for _, server := range shard.Servers {
 			// TODO: temporary fix due to discovery service returning server's cluster IP
 			server.Ip = c.config.DiscoveryAddress.IP
@@ -149,11 +162,7 @@ func (c *Client) Subscribe(gsn int32) (chan CommittedRecord, error) {
 
 // ReadRecord reads a record with a global sequence number from a shard.
 func (c *Client) ReadRecord(gsn int32, shardID int32) (string, error) {
-	shards, err := c.discoverShards()
-	if err != nil {
-		return "", err
-	}
-	for _, shard := range shards {
+	for _, shard := range c.view {
 		if shard.ShardID == shardID {
 			server := getRandomServerInShard(shard)
 			// TODO: temporary fix due to discovery service returning server's cluster IP
@@ -170,11 +179,7 @@ func (c *Client) ReadRecord(gsn int32, shardID int32) (string, error) {
 
 // Trim deletes records before a global sequence number from the data servers.
 func (c *Client) Trim(gsn int32) error {
-	shards, err := c.discoverShards()
-	if err != nil {
-		return err
-	}
-	for _, shard := range shards {
+	for _, shard := range c.view {
 		for _, server := range shard.Servers {
 			// TODO: temporary fix due to discovery service returning server's cluster IP
 			server.Ip = c.config.DiscoveryAddress.IP
@@ -249,6 +254,13 @@ func (c *Client) subscribeToServer(server *discovery.DataServer, gsn int32) erro
 			c.respond()
 		}
 		c.subscribeMu.Unlock()
+		if in.ViewID != c.viewID {
+			err := c.updateView()
+			if err != nil {
+				return err
+			}
+			c.viewID = in.ViewID
+		}
 	}
 }
 
@@ -277,7 +289,16 @@ func (c *Client) trimFromServer(server *discovery.DataServer, gsn int32) error {
 	defer conn.Close()
 	dataClient := data.NewDataClient(conn)
 	req := &data.TrimRequest{Gsn: gsn}
-	_, err = dataClient.Trim(context.Background(), req)
+	resp, err := dataClient.Trim(context.Background(), req)
+	c.viewMu.Lock()
+	if resp.ViewID != c.viewID {
+		err = c.updateView()
+		if err != nil {
+			return err
+		}
+		c.viewID = resp.ViewID
+	}
+	c.viewMu.Unlock()
 	return err
 }
 
@@ -295,25 +316,33 @@ func (c *Client) readFromServer(server *discovery.DataServer, gsn int32) (string
 	if err != nil {
 		return "", err
 	}
+	if resp.ViewID != c.viewID {
+		err := c.updateView()
+		if err != nil {
+			return "", err
+		}
+		c.viewID = resp.ViewID
+	}
 	return resp.Record, nil
 }
 
-// discoverShards queries the discovery service and returns the live data
-// servers grouped by shard.
-func (c *Client) discoverShards() ([]*discovery.Shard, error) {
+// updateView queries the discovery service and returns the live data servers
+// grouped by shard.
+func (c *Client) updateView() error {
 	opts := []grpc.DialOption{grpc.WithInsecure()}
 	conn, err := grpc.Dial(c.config.DiscoveryAddress.stats(), opts...)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	defer conn.Close()
 	discoveryClient := discovery.NewDiscoveryClient(conn)
 	req := &discovery.DiscoverRequest{}
 	resp, err := discoveryClient.DiscoverServers(context.Background(), req)
 	if err != nil {
-		return nil, err
+		return err
 	}
-	return resp.Shards, nil
+	c.view = resp.Shards
+	return nil
 }
 
 // getRandomServerInShard returns a random server in a shard.
