@@ -87,7 +87,7 @@ func NewClient() (*Client, error) {
 		viewMu:           sync.RWMutex{},
 		config:           config,
 	}
-	err = c.updateView()
+	err = c.updateView(int32(0))
 	if err != nil {
 		return nil, err
 	}
@@ -133,12 +133,11 @@ func (c *Client) AppendToShard(record string) (int32, int32, error) {
 		return -1, -1, err
 	}
 	c.viewMu.Lock()
-	if resp.ViewID != c.viewID {
-		err := c.updateView()
+	if resp.ViewID > c.viewID {
+		err := c.updateView(resp.ViewID)
 		if err != nil {
 			return -1, -1, err
 		}
-		c.viewID = resp.ViewID
 	}
 	c.viewMu.Lock()
 	return resp.Gsn, shard.ShardID, nil
@@ -254,12 +253,11 @@ func (c *Client) subscribeToServer(server *discovery.DataServer, gsn int32) erro
 			c.respond()
 		}
 		c.subscribeMu.Unlock()
-		if in.ViewID != c.viewID {
-			err := c.updateView()
+		if in.ViewID > c.viewID {
+			err := c.updateView(in.ViewID)
 			if err != nil {
 				return err
 			}
-			c.viewID = in.ViewID
 		}
 	}
 }
@@ -291,12 +289,11 @@ func (c *Client) trimFromServer(server *discovery.DataServer, gsn int32) error {
 	req := &data.TrimRequest{Gsn: gsn}
 	resp, err := dataClient.Trim(context.Background(), req)
 	c.viewMu.Lock()
-	if resp.ViewID != c.viewID {
-		err = c.updateView()
+	if resp.ViewID > c.viewID {
+		err = c.updateView(resp.ViewID)
 		if err != nil {
 			return err
 		}
-		c.viewID = resp.ViewID
 	}
 	c.viewMu.Unlock()
 	return err
@@ -316,19 +313,18 @@ func (c *Client) readFromServer(server *discovery.DataServer, gsn int32) (string
 	if err != nil {
 		return "", err
 	}
-	if resp.ViewID != c.viewID {
-		err := c.updateView()
+	if resp.ViewID > c.viewID {
+		err := c.updateView(resp.ViewID)
 		if err != nil {
 			return "", err
 		}
-		c.viewID = resp.ViewID
 	}
 	return resp.Record, nil
 }
 
 // updateView queries the discovery service and returns the live data servers
 // grouped by shard.
-func (c *Client) updateView() error {
+func (c *Client) updateView(knownViewID int32) error {
 	opts := []grpc.DialOption{grpc.WithInsecure()}
 	conn, err := grpc.Dial(c.config.DiscoveryAddress.stats(), opts...)
 	if err != nil {
@@ -336,13 +332,23 @@ func (c *Client) updateView() error {
 	}
 	defer conn.Close()
 	discoveryClient := discovery.NewDiscoveryClient(conn)
-	req := &discovery.DiscoverRequest{}
-	resp, err := discoveryClient.DiscoverServers(context.Background(), req)
-	if err != nil {
-		return err
+	var gotView int32
+	for i := 0; i < 8; i++ {
+		req := &discovery.DiscoverRequest{}
+		resp, err := discoveryClient.DiscoverServers(context.Background(), req)
+		if err != nil {
+			return err
+		}
+		if resp.ViewID >= knownViewID {
+			c.view = resp.Shards
+			c.viewID = resp.ViewID
+			return nil
+		}
+		gotView = resp.ViewID
+		// TODO: make this configurable
+		time.Sleep(100 * time.Millisecond)
 	}
-	c.view = resp.Shards
-	return nil
+	return fmt.Errorf("Update view error: expected %v, got %v", knownViewID, gotView)
 }
 
 // getRandomServerInShard returns a random server in a shard.
