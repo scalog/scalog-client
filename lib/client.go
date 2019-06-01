@@ -139,7 +139,7 @@ func (c *Client) AppendToShard(record string) (int32, int32, error) {
 			return -1, -1, err
 		}
 	}
-	c.viewMu.Lock()
+	c.viewMu.Unlock()
 	return resp.Gsn, shard.ShardID, nil
 }
 
@@ -253,12 +253,14 @@ func (c *Client) subscribeToServer(server *discovery.DataServer, gsn int32) erro
 			c.respond()
 		}
 		c.subscribeMu.Unlock()
+		c.viewMu.Lock()
 		if in.ViewID > c.viewID {
 			err := c.updateView(in.ViewID)
 			if err != nil {
 				return err
 			}
 		}
+		c.viewMu.Unlock()
 	}
 }
 
@@ -313,12 +315,14 @@ func (c *Client) readFromServer(server *discovery.DataServer, gsn int32) (string
 	if err != nil {
 		return "", err
 	}
+	c.viewMu.Lock()
 	if resp.ViewID > c.viewID {
 		err := c.updateView(resp.ViewID)
 		if err != nil {
 			return "", err
 		}
 	}
+	c.viewMu.Unlock()
 	return resp.Record, nil
 }
 
